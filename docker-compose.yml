@@ -1,0 +1,35 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://top:top@db:5432/top
+      JWT_SECRET: promeni-ovu-vrednost
+      MNEMONIC_PEPPER: promeni-i-ovu-vrednost
+      ANONYMOUS_SECRET_MOVES: '{"w":[{"from":"e2","to":"e4"},{"from":"g1","to":"f3"},{"from":"f1","to":"b5"},{"from":"e1","to":"g1"},{"from":"d1","to":"e2"}],"b":[{"from":"e7","to":"e5"},{"from":"b8","to":"c6"},{"from":"g8","to":"f6"},{"from":"f8","to":"b4"},{"from":"e8","to":"g8"}]}'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: top
+      POSTGRES_USER: top
+      POSTGRES_PASSWORD: top
+    volumes:
+      - top-db:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U top -d top"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  top-db:
