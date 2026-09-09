@@ -16,6 +16,8 @@ Poveži ovaj GitHub repository kao Docker Compose projekat. Aplikacija koristi p
 
 Pre produkcije promeni `JWT_SECRET`, `MNEMONIC_PEPPER` i `ANONYMOUS_SECRET_MOVES` u environment podešavanjima.
 
+Coolify health-check koristi `GET /api/health` na portu `8080` i proverava dostupnost PostgreSQL baze.
+
 Za GitHub/Coolify koristi privatni repository i nikada ne postavljaj `.env` fajl u Git. `.env.example` je samo šablon.
 
 ## Privatnost tajnog četa
