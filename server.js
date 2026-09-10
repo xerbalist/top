@@ -10,6 +10,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { advanceSequence, moveForColor, validatePersonalSequence } from './lib/move-sequence.js';
+import { chooseBotMove } from './lib/bot-engine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express(); const server = http.createServer(app); const io = new Server(server);
@@ -83,9 +84,14 @@ const gameState = g => ({
   fen:g.chess.fen(),
   turn:g.chess.turn(),
   history:g.chess.history(),
+  lastMove:g.lastMove || null,
+  legalMoves:g.ended||g.chess.isGameOver()?[]:g.chess.moves({verbose:true}).map(move=>({from:move.from,to:move.to,promotion:move.promotion||null})),
   players:g.players,
+  bot:Boolean(g.bot),
+  botName:g.bot?.name || null,
+  botThinking:Boolean(g.botThinking),
   ready:Boolean(g.players.w&&g.players.b),
-  chatUnlocked:Boolean(g.unlocked&&!g.ended&&!g.chess.isGameOver()),
+  chatUnlocked:Boolean(!g.bot&&g.unlocked&&!g.ended&&!g.chess.isGameOver()),
   gameOver:Boolean(g.ended||g.chess.isGameOver()),
   endReason:g.endReason||endReason(g.chess)
 });
@@ -119,14 +125,35 @@ app.post('/api/challenges',auth,async(req,res)=>{ const relation=await q(`SELECT
 app.get('/api/challenges',auth,async(req,res)=>{ const r=await q(`SELECT c.id,c.status,c.created_at,c.expires_at,u.username AS challenger FROM challenges c JOIN users u ON u.id=c.challenger WHERE c.opponent=$1 AND c.status='pending' AND c.expires_at>now() ORDER BY c.created_at DESC`,[req.user.id]); res.json(r.rows); });
 app.post('/api/challenges/:id/respond',auth,async(req,res)=>{ const c=await q(`SELECT * FROM challenges WHERE id=$1 AND opponent=$2 AND status='pending' AND expires_at>now()`,[req.params.id,req.user.id]); if(!c.rows[0])return res.status(404).json({error:'Izazov nije pronađen ili je istekao.'}); if(req.body.status!=='accepted'){await q(`UPDATE challenges SET status='declined' WHERE id=$1`,[req.params.id]);return res.json({ok:true});} await q(`UPDATE challenges SET status='accepted' WHERE id=$1`,[req.params.id]); const id=newGame(c.rows[0].challenger,c.rows[0].opponent); io.to(`user:${c.rows[0].challenger}`).emit('challenge-accepted',{gameId:id}); res.json({ok:true,gameId:id}); });
 
-function newGame(a=null,b=null){ const id=crypto.randomUUID(); games.set(id,{id,chess:new Chess(),players:{w:a,b},progress:{w:0,b:0},anonProgress:{},drawOffer:null,unlocked:false,createdAt:Date.now()}); return id; }
+function newGame(a=null,b=null,options={}){ const id=crypto.randomUUID(); games.set(id,{id,chess:new Chess(),players:{w:a,b},progress:{w:0,b:0},anonProgress:{},drawOffer:null,unlocked:false,lastMove:null,bot:options.bot||null,botThinking:false,createdAt:Date.now()}); return id; }
 function findGame(idOrCode){ const value=String(idOrCode||''); if(games.has(value))return games.get(value); if(value.length<8)return null; const matches=[...games.values()].filter(game=>game.id.startsWith(value)); return matches.length===1?matches[0]:null; }
 app.post('/api/games',optionalAuth,async(req,res)=>{ const playerId=identity(req)||`anon:${crypto.randomUUID()}`; const id=newGame(playerId,null); res.json({id,joinCode:id.slice(0,8),playerId,color:'w'}); });
+app.post('/api/games/bot',optionalAuth,async(req,res)=>{ const playerId=identity(req)||`anon:${crypto.randomUUID()}`; const id=newGame(playerId,'bot:top',{bot:{color:'b',name:'TOP Bot'}}); res.json({id,playerId,color:'w',bot:true}); });
 app.post('/api/games/:id/join',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); if(!g)return res.status(404).json({error:'Partija nije pronađena.'}); const playerId=identity(req)||`anon:${crypto.randomUUID()}`; if(g.players.w===playerId)return res.json({ok:true,id:g.id,playerId,color:'w'}); if(!g.players.b)g.players.b=playerId; if(g.players.b!==playerId)return res.status(409).json({error:'Partija je već popunjena.'}); io.to(g.id).emit('state',gameState(g)); res.json({ok:true,id:g.id,playerId,color:'b'}); });
 app.get('/api/games/:id',async(req,res)=>{ const g=findGame(req.params.id); if(!g) return res.status(404).json({error:'Partija ne postoji ili je završena.'}); res.json(gameState(g)); });
-app.post('/api/games/:id/move',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); if(!g) return res.status(404).json({error:'Partija nije pronađena.'}); try { if(!g.players.b)return res.status(409).json({error:'Sačekaj da se protivnik pridruži.'}); if(g.ended||g.chess.isGameOver())return res.status(409).json({error:'Partija je završena.'}); const playerId=identity(req); const color=g.players.w===playerId?'w':g.players.b===playerId?'b':null; if(!color||g.chess.turn()!==color)return res.status(403).json({error:'Nisi na potezu ili nisi igrač ove partije.'}); const move=g.chess.move(req.body.move); if(!move) throw Error(); g.drawOffer=null; const played={from:move.from,to:move.to,promotion:move.promotion||null}; const isAnonymous=String(playerId).startsWith('anon:'); if(isAnonymous){ const secret=anonymousSecret[color]; g.anonProgress[playerId]=advanceSequence(secret,g.anonProgress[playerId]||0,played); if(g.anonProgress[playerId]>=5&&secret.length===5)g.unlocked=true; } else { if(!g.secretLoaded)g.secretLoaded={}; if(!g.secretLoaded[color]){ const r=await q('SELECT secret_moves FROM users WHERE id=$1',[g.players[color]]); g.secretLoaded[color]=normaliseSecretMoves(r.rows[0]?.secret_moves)[color]; } const secret=g.secretLoaded?.[color]||[]; g.progress[color]=advanceSequence(secret,g.progress[color],played); if(g.progress.w>=5&&g.progress.b>=5)g.unlocked=true; } if(g.chess.isGameOver()){g.ended=true;g.unlocked=false;g.endReason=endReason(g.chess);} const state=gameState(g); io.to(g.id).emit('state',state); res.json({ok:true,move,...state}); } catch { res.status(400).json({error:'Neispravan potez.'}); }});
-app.post('/api/games/:id/resign',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); if(!g)return res.status(404).end(); if(![g.players.w,g.players.b].includes(identity(req)))return res.status(403).json({error:'Nisi igrač ove partije.'}); if(g.ended||g.chess.isGameOver())return res.status(409).json({error:'Partija je već završena.'}); g.ended=true; g.unlocked=false; g.endReason='predaja'; io.to(g.id).emit('ended',{reason:g.endReason}); res.json({ok:true,...gameState(g)}); });
-app.post('/api/games/:id/draw-offer',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); const playerId=identity(req); if(!g||![g.players.w,g.players.b].includes(playerId))return res.status(403).json({error:'Nisi igrač ove partije.'}); if(!g.players.b)return res.status(409).json({error:'Sačekaj da se protivnik pridruži.'}); if(g.ended||g.chess.isGameOver())return res.status(400).json({error:'Partija je završena.'}); g.drawOffer=playerId; io.to(g.id).emit('draw-offer',{offeredBy:playerId}); res.json({ok:true}); });
+function scheduleBotMove(g){
+  if(!g.bot||g.botThinking||g.ended||g.chess.isGameOver()||g.chess.turn()!==g.bot.color)return;
+  g.botThinking=true;
+  g.botTimer=setTimeout(()=>{
+    try {
+      if(!g.ended&&!g.chess.isGameOver()){
+        const move=chooseBotMove(g.chess,{depth:2});
+        if(move){const played=g.chess.move(move);g.lastMove={from:played.from,to:played.to};}
+        if(g.chess.isGameOver()){g.ended=true;g.unlocked=false;g.endReason=endReason(g.chess);}
+      }
+    } catch {
+      g.ended=true;
+      g.endReason='bot nije dostupan';
+    } finally {
+      g.botThinking=false;
+      g.botTimer=null;
+      io.to(g.id).emit('state',gameState(g));
+    }
+  },420);
+}
+app.post('/api/games/:id/move',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); if(!g) return res.status(404).json({error:'Partija nije pronađena.'}); try { if(!g.players.b)return res.status(409).json({error:'Sačekaj da se protivnik pridruži.'}); if(g.ended||g.chess.isGameOver())return res.status(409).json({error:'Partija je završena.'}); const playerId=identity(req); const color=g.players.w===playerId?'w':g.players.b===playerId?'b':null; if(!color||g.chess.turn()!==color)return res.status(403).json({error:'Nisi na potezu ili nisi igrač ove partije.'}); const move=g.chess.move(req.body.move); if(!move) throw Error(); g.drawOffer=null; const played={from:move.from,to:move.to,promotion:move.promotion||null}; g.lastMove={from:move.from,to:move.to}; const isAnonymous=String(playerId).startsWith('anon:'); if(!g.bot&&isAnonymous){ const secret=anonymousSecret[color]; g.anonProgress[playerId]=advanceSequence(secret,g.anonProgress[playerId]||0,played); if(g.anonProgress[playerId]>=5&&secret.length===5)g.unlocked=true; } else if(!g.bot) { if(!g.secretLoaded)g.secretLoaded={}; if(!g.secretLoaded[color]){ const r=await q('SELECT secret_moves FROM users WHERE id=$1',[g.players[color]]); g.secretLoaded[color]=normaliseSecretMoves(r.rows[0]?.secret_moves)[color]; } const secret=g.secretLoaded?.[color]||[]; g.progress[color]=advanceSequence(secret,g.progress[color],played); if(g.progress.w>=5&&g.progress.b>=5)g.unlocked=true; } if(g.chess.isGameOver()){g.ended=true;g.unlocked=false;g.endReason=endReason(g.chess);} else scheduleBotMove(g); const state=gameState(g); io.to(g.id).emit('state',state); res.json({ok:true,move,...state}); } catch { res.status(400).json({error:'Neispravan potez.'}); }});
+app.post('/api/games/:id/resign',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); if(!g)return res.status(404).end(); if(![g.players.w,g.players.b].includes(identity(req)))return res.status(403).json({error:'Nisi igrač ove partije.'}); if(g.ended||g.chess.isGameOver())return res.status(409).json({error:'Partija je već završena.'}); if(g.botTimer){clearTimeout(g.botTimer);g.botTimer=null;g.botThinking=false;} g.ended=true; g.unlocked=false; g.endReason='predaja'; io.to(g.id).emit('ended',{reason:g.endReason}); res.json({ok:true,...gameState(g)}); });
+app.post('/api/games/:id/draw-offer',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); const playerId=identity(req); if(!g||![g.players.w,g.players.b].includes(playerId))return res.status(403).json({error:'Nisi igrač ove partije.'}); if(g.bot)return res.status(400).json({error:'Bot ne prihvata ponudu remija.'}); if(!g.players.b)return res.status(409).json({error:'Sačekaj da se protivnik pridruži.'}); if(g.ended||g.chess.isGameOver())return res.status(400).json({error:'Partija je završena.'}); g.drawOffer=playerId; io.to(g.id).emit('draw-offer',{offeredBy:playerId}); res.json({ok:true}); });
 app.post('/api/games/:id/draw-accept',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); const playerId=identity(req); if(!g||![g.players.w,g.players.b].includes(playerId)||!g.drawOffer||g.drawOffer===playerId)return res.status(400).json({error:'Nema ponude remija.'}); if(g.ended||g.chess.isGameOver())return res.status(409).json({error:'Partija je već završena.'}); g.ended=true; g.unlocked=false; g.endReason='remi'; io.to(g.id).emit('ended',{reason:g.endReason}); res.json({ok:true,...gameState(g)}); });
 app.post('/api/games/:id/draw-decline',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); const playerId=identity(req); if(!g||![g.players.w,g.players.b].includes(playerId))return res.status(403).json({error:'Nisi igrač ove partije.'}); g.drawOffer=null; io.to(g.id).emit('draw-declined'); res.json({ok:true}); });
 const socketIdentity = socket => {
@@ -136,7 +163,7 @@ const socketIdentity = socket => {
   return playerId.startsWith('anon:')?playerId:null;
 };
 io.on('connection',socket=>{ socket.data.playerId=socketIdentity(socket); if(socket.data.playerId&&!String(socket.data.playerId).startsWith('anon:'))socket.join(`user:${socket.data.playerId}`); socket.on('join-game',id=>{ const g=findGame(id); if(!g||![g.players.w,g.players.b].includes(socket.data.playerId))return; socket.join(g.id); socket.data.game=g.id; }); socket.on('chat-message',({gameId,text}={})=>{ const g=findGame(gameId); const clean=String(text||'').trim(); if(!g?.unlocked||g.ended||g.chess.isGameOver()||![g.players.w,g.players.b].includes(socket.data.playerId)||!clean||clean.length>1000)return; io.to(g.id).emit('chat-message',{text:clean,at:Date.now()}); }); });
-setInterval(()=>{ const cutoff=Date.now()-86400000; for(const [id,g] of games)if(g.createdAt<cutoff)games.delete(id); const now=Date.now(); for(const [key,times] of requestBuckets) { const active=times.filter(t=>now-t<60000); if(active.length)requestBuckets.set(key,active); else requestBuckets.delete(key); }},3600000);
+setInterval(()=>{ const cutoff=Date.now()-86400000; for(const [id,g] of games)if(g.createdAt<cutoff){if(g.botTimer)clearTimeout(g.botTimer);games.delete(id);} const now=Date.now(); for(const [key,times] of requestBuckets) { const active=times.filter(t=>now-t<60000); if(active.length)requestBuckets.set(key,active); else requestBuckets.delete(key); }},3600000);
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 async function start(){
   if(process.env.NODE_ENV==='production'&&(!process.env.JWT_SECRET||!process.env.MNEMONIC_PEPPER)){

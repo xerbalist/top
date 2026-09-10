@@ -1,1 +1,29 @@
-<!doctype html><html lang="sr-Latn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TOP — šah</title><link rel="stylesheet" href="/styles.css"><script src="/socket.io/socket.io.js"></script></head><body><div class="app"><header><div class="brand"><span class="rook">♜</span><span>TOP</span></div><nav><button data-view="home">Početna</button><button data-view="friends">Prijatelji</button><button data-view="profile">Profil</button><button data-view="login" id="authBtn">Prijava</button></nav></header><main id="root"></main></div><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="sr-Latn">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#262522">
+    <title>TOP — igraj šah</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="sidebar">
+        <button class="brand" data-view="home" aria-label="TOP početna">
+          <span class="brand-mark">♜</span>
+          <span>TOP</span>
+        </button>
+        <nav aria-label="Glavna navigacija">
+          <button data-view="home"><span class="nav-icon">♟</span><span>Igraj</span></button>
+          <button data-view="friends"><span class="nav-icon">♞</span><span>Prijatelji</span></button>
+          <button data-view="profile"><span class="nav-icon">♚</span><span>Profil</span></button>
+        </nav>
+        <button data-view="login" id="authBtn" class="auth-button">Prijava</button>
+      </header>
+      <main id="root"></main>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -2,6 +2,12 @@
 
 TOP je Coolify-ready Node.js aplikacija na srpskom jeziku. Koristi `chess.js`, Express, Socket.IO i PostgreSQL.
 
+Interfejs koristi moderan tamni stil šahovskih platformi, prilagodljiv je telefonu
+i računaru, prikazuje legalna odredišta i označava poslednji potez. Sa početne
+strane može odmah da se pokrene partija protiv ugrađenog TOP Bota. Bot ne koristi
+spoljni servis: radi kroz laganu alpha-beta pretragu i evaluaciju pozicije nad
+`chess.js` pravilima.
+
 Početna strana uvek prikazuje šahovsku tablu. Registrovani korisnik u profilu
 unosi dve nezavisne sekvence od po pet poteza: jednu za bele i jednu za crne
 figure. Kada prijatelj prihvati izazov, oba trenutno povezana igrača automatski

@@ -8,6 +8,8 @@ Korisnik u profilu postavlja dve nezavisne sekvence od po tačno pet tajnih pote
 
 Podrži mat, pat, remi, predaju i normalan završetak partije. Početna strana uvek prikazuje šahovsku tablu. Dodaj prijatelje, zahteve za prijateljstvo, blokiranje, listu prijatelja i dugme „Izazovi prijatelja“. Izazov stvara privatnu pozivnicu sa prihvatanjem, odbijanjem i istekom; prihvatanje automatski otvara partiju kod oba povezana igrača. Dodaj status feed nalik Twitteru: objava do 280 karaktera, izmena, brisanje, lajkovi, odgovori i osnovno prijavljivanje. Statusi su persistentni, ali tajni čet nije.
 
+UI treba da bude uglađen, moderan i vizuelno inspirisan vodećim šahovskim platformama: tamna pozadina, zelene akcije, bočna navigacija, velika tabla, jasan panel partije, oznaka poslednjeg poteza i prikaz legalnih odredišta. Ne kopiraj tuđe logotipe ili zaštićene elemente. Omogući igru protiv ugrađenog lightweight TOP Bota koji koristi `chess.js`, evaluaciju materijala i pozicije i alpha-beta pretragu, bez spoljnog AI servisa.
+
 Mnemonic fraza mora da koristi samo srpske reči koje se prirodno pišu bez dijakritika, nikada ošišanu latinicu. Posle registracije omogući kopiranje i preuzimanje fraze kao `.txt` fajla.
 
 Interfejs neka bude jednostavan, moderan i vizuelno inspirisan Lichess-om, bez napredne analize, rejtinga, turnira, Stockfish-a, javnih soba ili privatnih poruka. Svi važni podaci i potezi moraju se proveravati na serveru. Dodaj rate limiting, bezbedne hash funkcije za lozinke, sesije/JWT u sigurnim cookie-jima, validaciju unosa, cleanup memorijskih soba i Coolify/Docker dokumentaciju.

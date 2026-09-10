@@ -61,6 +61,7 @@ function syncAccountSocket() {
 }
 
 function view(viewName = 'home') {
+  document.body.dataset.page = viewName;
   if (viewName === 'logout') {
     api('/auth/logout', { method: 'POST', body: '{}' }).catch(() => {});
     localStorage.removeItem('topToken');
@@ -187,19 +188,40 @@ function authPage(registering) {
 function homePage() {
   layout(`
     <section class="home-chess">
-      <div id="homeBoard" class="board preview-board" aria-label="Početna šahovska tabla"></div>
-      <div class="card home-actions">
-        <h1>TOP ♜</h1>
-        <p>Jednostavan šah sa prijateljima.</p>
-        <div class="form-actions">
-          <button class="primary" id="new">Nova partija</button>
-          <button id="join">Pridruži se partiji</button>
+      <div class="board-column home-board-column">
+        <div class="player-bar">
+          <span class="player-avatar bot-avatar">♞</span>
+          <span><b>TOP Bot</b><small>uvek spreman</small></span>
+          <span class="online-dot" title="Dostupan"></span>
         </div>
-        <hr>
-        <h2>${me ? `Zdravo, ${esc(me.username)}` : 'Igraj anonimno'}</h2>
-        <p class="muted">
-          ${me ? 'Poveži se sa prijateljima i objavi status.' : 'Možeš igrati bez registracije.'}
-        </p>
+        <div id="homeBoard" class="board preview-board" aria-label="Početna šahovska tabla"></div>
+        <div class="player-bar">
+          <span class="player-avatar">${me ? esc(me.username[0].toUpperCase()) : 'G'}</span>
+          <span><b>${me ? esc(me.username) : 'Gost'}</b><small>${me ? 'spreman za partiju' : 'igraj bez naloga'}</small></span>
+        </div>
+      </div>
+      <div class="card home-actions">
+        <span class="eyebrow">DOBRO DOŠAO U TOP</span>
+        <h1>Igraj šah.<br><span>Igraj pametno.</span></h1>
+        <p class="hero-copy">Brza partija bez sata, protiv prijatelja, anonimnog igrača ili našeg laganog bota.</p>
+        <div class="play-options">
+          <button class="primary play-option" id="botGame">
+            <span class="option-icon">♞</span>
+            <span><b>Igraj protiv bota</b><small>Počni odmah kao beli</small></span>
+          </button>
+          <button class="play-option" id="new">
+            <span class="option-icon">♟</span>
+            <span><b>Nova partija</b><small>Podeli kod sa protivnikom</small></span>
+          </button>
+          <button class="play-option subtle" id="join">
+            <span class="option-icon">➜</span>
+            <span><b>Unesi kod partije</b><small>Pridruži se postojećoj partiji</small></span>
+          </button>
+        </div>
+        <div class="home-note">
+          <span class="pulse-dot"></span>
+          ${me ? `Prijavljen kao <b>${esc(me.username)}</b>` : 'Registracija nije potrebna za igru'}
+        </div>
       </div>
     </section>
   `);
@@ -215,6 +237,15 @@ function homePage() {
     try {
       const data = await api('/games', { method: 'POST', body: '{}' });
       localStorage.topPlayerId = data.playerId;
+      openGame(data.id);
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+  document.querySelector('#botGame').onclick = async () => {
+    try {
+      const data = await api('/games/bot', { method: 'POST', body: '{}' });
+      if (data.playerId) localStorage.topPlayerId = data.playerId;
       openGame(data.id);
     } catch (error) {
       alert(error.message);
@@ -467,22 +498,31 @@ async function friendsPage() {
   loadFeed();
 }
 
-function createSquare(x, y, piece, selected, onPick) {
+function createSquare(x, y, piece, selected, onPick, lastMove, legalTargets) {
   const square = document.createElement('div');
   square.className = `sq ${(x + y) % 2 ? 'dark' : 'light'}`;
   square.dataset.file = String.fromCharCode(97 + x);
   square.dataset.rank = String(8 - y);
   square.dataset.square = square.dataset.file + square.dataset.rank;
   if (selected === square.dataset.square) square.classList.add('selected');
+  if (lastMove?.from === square.dataset.square || lastMove?.to === square.dataset.square) {
+    square.classList.add('last-move');
+  }
+  if (legalTargets.has(square.dataset.square)) {
+    square.classList.add(piece ? 'legal-capture' : 'legal-target');
+  }
   if (piece) {
     const color = piece === piece.toUpperCase() ? 'w' : 'b';
     square.innerHTML = `<img class="piece-img" src="/pieces/cburnett/${color}${piece.toUpperCase()}.svg" alt="">`;
+  }
+  if (legalTargets.has(square.dataset.square)) {
+    square.insertAdjacentHTML('beforeend', '<span class="move-hint"></span>');
   }
   square.onclick = () => onPick(square.dataset.square);
   return square;
 }
 
-function renderBoard(board, fen, selected, onPick, orientation = 'w') {
+function renderBoard(board, fen, selected, onPick, orientation = 'w', options = {}) {
   board.innerHTML = '';
   const rows = fen.split(' ')[0].split('/');
   const squares = [];
@@ -501,8 +541,9 @@ function renderBoard(board, fen, selected, onPick, orientation = 'w') {
     }
   });
   if (orientation === 'b') squares.reverse();
+  const legalTargets = new Set(options.legalTargets || []);
   squares.forEach(square => {
-    board.appendChild(createSquare(square.x, square.y, square.piece, selected, onPick));
+    board.appendChild(createSquare(square.x, square.y, square.piece, selected, onPick, options.lastMove, legalTargets));
   });
 }
 
@@ -658,26 +699,44 @@ async function gamePage(id) {
   let gameId = id;
   layout(`
     <div class="chess">
-      <section>
+      <section class="board-column game-board-column">
+        <div class="player-bar opponent-bar">
+          <span class="player-avatar" id="opponentAvatar">P</span>
+          <span><b id="opponentName">Protivnik</b><small id="opponentStatus">povezan</small></span>
+          <span class="online-dot"></span>
+        </div>
         <div id="board" class="board"></div>
-        <div class="card game-controls">
-          <b id="turn">Učitavanje…</b>
-          <p class="muted">Kod partije: <b id="gameCode"></b> <button id="copyGame">Kopiraj</button></p>
-          <div id="moves" class="moves"></div>
-          <div class="form-actions">
-            <button class="danger" id="resign">Predaj partiju</button>
-            <button id="drawOffer">Ponudi remi</button>
-          </div>
+        <div class="player-bar">
+          <span class="player-avatar">${me ? esc(me.username[0].toUpperCase()) : 'G'}</span>
+          <span><b id="playerName">${me ? esc(me.username) : 'Gost'}</b><small>ti</small></span>
         </div>
       </section>
-      <aside class="card" id="messagePanel" hidden>
-        <div id="chat">
-          <div class="chatlog" id="chatlog"></div>
-          <div class="row">
-            <input id="chatinput" maxlength="1000" autocomplete="off" placeholder="Napiši poruku">
-            <button id="send">Pošalji</button>
-          </div>
+      <aside class="card game-panel">
+        <div class="game-panel-title">
+          <span class="panel-rook">♜</span>
+          <div><h2 id="gameTitle">Partija</h2><small>Bez vremenskog ograničenja</small></div>
         </div>
+        <div class="turn-banner" id="turn">Učitavanje…</div>
+        <div id="moves" class="moves game-moves"></div>
+        <div class="share-game" id="gameShare">
+          <span>Kod partije</span>
+          <b id="gameCode"></b>
+          <button id="copyGame" title="Kopiraj kod">Kopiraj</button>
+        </div>
+        <div class="form-actions game-actions">
+          <button class="danger" id="resign">Predaj partiju</button>
+          <button id="drawOffer">Ponudi remi</button>
+        </div>
+        <section id="messagePanel" hidden>
+          <div class="panel-divider"></div>
+          <div id="chat">
+            <div class="chatlog" id="chatlog"></div>
+            <div class="row">
+              <input id="chatinput" maxlength="1000" autocomplete="off" placeholder="Napiši poruku">
+              <button class="primary" id="send">Pošalji</button>
+            </div>
+          </div>
+        </section>
       </aside>
     </div>
   `);
@@ -719,16 +778,48 @@ async function gamePage(id) {
   function render() {
     const playerId = currentPlayerId();
     const orientation = state.players?.b === playerId ? 'b' : 'w';
-    renderBoard(document.querySelector('#board'), state.fen, selected, play, orientation);
-    document.querySelector('#turn').textContent = state.gameOver
+    const legalTargets = selected
+      ? (state.legalMoves || []).filter(move => move.from === selected).map(move => move.to)
+      : [];
+    renderBoard(document.querySelector('#board'), state.fen, selected, play, orientation, {
+      lastMove:state.lastMove,
+      legalTargets
+    });
+    const turnElement = document.querySelector('#turn');
+    turnElement.textContent = state.gameOver
       ? `Partija završena${state.endReason ? ` — ${state.endReason}` : ''}`
       : !state.ready
         ? 'Čeka se protivnik…'
-      : `Na potezu je ${state.turn === 'w' ? 'beli' : 'crni'}`;
-    document.querySelector('#moves').textContent = state.history.join(' · ') || 'Još nema poteza.';
+        : state.botThinking
+          ? 'TOP Bot razmišlja…'
+          : state.turn === orientation
+            ? 'Ti si na potezu'
+            : `Na potezu je ${state.turn === 'w' ? 'beli' : 'crni'}`;
+    turnElement.dataset.state = state.gameOver ? 'ended' : state.turn === orientation ? 'active' : 'waiting';
+    const moveRows = [];
+    for (let index = 0; index < state.history.length; index += 2) {
+      moveRows.push(`
+        <div class="move-row">
+          <span>${index / 2 + 1}.</span>
+          <b>${esc(state.history[index] || '')}</b>
+          <b>${esc(state.history[index + 1] || '')}</b>
+        </div>
+      `);
+    }
+    document.querySelector('#moves').innerHTML = moveRows.join('') || '<p class="empty-moves">Partija je spremna. Povuci prvi potez.</p>';
+    document.querySelector('#gameTitle').textContent = state.bot ? 'Partija protiv TOP Bota' : 'Partija uživo';
+    document.querySelector('#opponentName').textContent = state.bot ? (state.botName || 'TOP Bot') : 'Protivnik';
+    document.querySelector('#opponentAvatar').textContent = state.bot ? '♞' : 'P';
+    document.querySelector('#opponentAvatar').classList.toggle('bot-avatar', Boolean(state.bot));
+    document.querySelector('#opponentStatus').textContent = state.bot
+      ? state.botThinking ? 'razmišlja…' : 'lagani nivo'
+      : state.ready ? 'povezan' : 'čeka se povezivanje';
+    document.querySelector('.opponent-bar .online-dot').classList.toggle('offline', !state.ready);
+    document.querySelector('#gameShare').hidden = Boolean(state.bot);
     const messagesAvailable = state.chatUnlocked && !state.gameOver;
     document.querySelector('#messagePanel').hidden = !messagesAvailable;
     document.querySelector('#resign').disabled = state.gameOver || !state.ready;
+    document.querySelector('#drawOffer').hidden = Boolean(state.bot);
     document.querySelector('#drawOffer').disabled = state.gameOver || !state.ready;
   }
 
