@@ -159,8 +159,7 @@ textarea {
 }
 
 body[data-page="home"] .sidebar nav [data-view="home"],
-body[data-page="friends"] .sidebar nav [data-view="friends"],
-body[data-page="profile"] .sidebar nav [data-view="profile"] {
+body[data-page="friends"] .sidebar nav [data-view="friends"] {
   background: rgba(129, 182, 76, 0.15);
   color: #fff;
 }
@@ -194,6 +193,11 @@ body[data-page="profile"] .sidebar nav [data-view="profile"] {
   background: transparent;
   box-shadow: none;
   text-align: left;
+}
+
+.sidebar-user:hover,
+body[data-page="profile"] .sidebar-user {
+  background: rgba(129, 182, 76, 0.15);
 }
 
 .sidebar-user > span:last-child {
@@ -846,6 +850,111 @@ form {
   backdrop-filter: blur(8px);
 }
 
+.top-dialog-overlay {
+  animation: top-overlay-in 150ms ease-out;
+}
+
+.top-dialog {
+  width: min(500px, 100%);
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.1);
+  animation: top-dialog-in 180ms ease-out;
+}
+
+.top-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(24, 23, 21, 0.3);
+}
+
+.top-dialog-header img {
+  width: 43px;
+  height: 43px;
+  object-fit: contain;
+}
+
+.top-dialog-header small {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+}
+
+.top-dialog-header h2 {
+  margin: 1px 0 0;
+  font-size: 22px;
+}
+
+.top-dialog-form {
+  max-width: none;
+  gap: 0;
+}
+
+.top-dialog-body {
+  padding: 22px;
+}
+
+.top-dialog-message {
+  margin: 0;
+  color: #dededc;
+  line-height: 1.6;
+}
+
+.top-dialog-fields {
+  display: grid;
+  gap: 15px;
+}
+
+.top-dialog-message + .top-dialog-fields {
+  margin-top: 18px;
+}
+
+.top-dialog-field {
+  display: grid;
+  gap: 7px;
+  color: #dededc;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.top-dialog-field input,
+.top-dialog-field textarea {
+  border-color: rgba(255, 255, 255, 0.13);
+  background: #211f1d;
+}
+
+.top-dialog-field textarea[readonly],
+.top-dialog-field input[readonly] {
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  user-select: all;
+}
+
+.top-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 15px 22px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(24, 23, 21, 0.25);
+}
+
+.top-dialog-actions button {
+  min-width: 105px;
+}
+
+@keyframes top-overlay-in {
+  from { opacity: 0; }
+}
+
+@keyframes top-dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
 .mnemonic-modal {
   width: min(540px, 100%);
 }
@@ -855,6 +964,15 @@ form {
   color: #fff;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   line-height: 1.7;
+}
+
+.mnemonic-modal .top-dialog-body > p {
+  margin-top: 0;
+  color: #dededc;
+}
+
+.mnemonic-tools {
+  margin-top: 12px;
 }
 
 .confirm-line {
@@ -973,17 +1091,13 @@ form {
     display: grid;
     grid-column: 1 / -1;
     grid-row: 2;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sidebar-account {
     position: absolute;
     top: 8px;
     right: 8px;
-  }
-
-  .sidebar-user {
-    display: none;
   }
 
   .sidebar nav button {

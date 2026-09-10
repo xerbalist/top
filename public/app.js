@@ -9,6 +9,99 @@ const esc = value => String(value).replace(
   character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
 );
 
+function topDialog({
+  title = 'TOP',
+  message = '',
+  fields = [],
+  confirmText = 'U redu',
+  cancelText = null,
+  danger = false
+} = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay top-dialog-overlay';
+    const fieldMarkup = fields.map(field => {
+      const attributes = [
+        `name="${esc(field.name)}"`,
+        field.required ? 'required' : '',
+        field.readonly ? 'readonly' : '',
+        field.autocomplete ? `autocomplete="${esc(field.autocomplete)}"` : '',
+        field.minlength ? `minlength="${Number(field.minlength)}"` : '',
+        field.maxlength ? `maxlength="${Number(field.maxlength)}"` : '',
+        field.placeholder ? `placeholder="${esc(field.placeholder)}"` : ''
+      ].filter(Boolean).join(' ');
+      const control = field.multiline
+        ? `<textarea ${attributes} rows="${Number(field.rows) || 4}">${esc(field.value || '')}</textarea>`
+        : `<input ${attributes} type="${esc(field.type || 'text')}" value="${esc(field.value || '')}">`;
+      return `<label class="top-dialog-field"><span>${esc(field.label)}</span>${control}</label>`;
+    }).join('');
+
+    overlay.innerHTML = `
+      <section class="card top-dialog" role="dialog" aria-modal="true" aria-labelledby="topDialogTitle">
+        <header class="top-dialog-header">
+          <img src="/top-logo.svg" alt="">
+          <div><small>TOP</small><h2 id="topDialogTitle">${esc(title)}</h2></div>
+        </header>
+        <form class="top-dialog-form">
+          <div class="top-dialog-body">
+            ${message ? `<p class="top-dialog-message">${esc(message)}</p>` : ''}
+            ${fieldMarkup ? `<div class="top-dialog-fields">${fieldMarkup}</div>` : ''}
+          </div>
+          <footer class="top-dialog-actions">
+            ${cancelText ? `<button type="button" data-dialog-cancel>${esc(cancelText)}</button>` : ''}
+            <button type="submit" class="${danger ? 'danger' : 'primary'}">${esc(confirmText)}</button>
+          </footer>
+        </form>
+      </section>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector('form');
+    let finished = false;
+    const finish = value => {
+      if (finished) return;
+      finished = true;
+      document.removeEventListener('keydown', onKeydown);
+      overlay.remove();
+      resolve(value);
+    };
+    const cancel = () => finish(null);
+    const onKeydown = event => {
+      if (event.key === 'Escape' && cancelText) cancel();
+    };
+    document.addEventListener('keydown', onKeydown);
+    form.onsubmit = event => {
+      event.preventDefault();
+      finish(Object.fromEntries(new FormData(form)));
+    };
+    overlay.querySelector('[data-dialog-cancel]')?.addEventListener('click', cancel);
+    overlay.addEventListener('mousedown', event => {
+      if (event.target === overlay && cancelText) cancel();
+    });
+    requestAnimationFrame(() => (form.querySelector('input, textarea, button') || form).focus());
+  });
+}
+
+async function topAlert(message, title = 'Obaveštenje') {
+  await topDialog({ title, message });
+}
+
+async function topConfirm(message, { title = 'Potvrda', confirmText = 'Potvrdi', danger = false } = {}) {
+  return Boolean(await topDialog({ title, message, confirmText, cancelText:'Odustani', danger }));
+}
+
+async function topPrompt(label, {
+  title = 'Unos', value = '', placeholder = '', multiline = false, required = false, readonly = false
+} = {}) {
+  const result = await topDialog({
+    title,
+    fields:[{ name:'value', label, value, placeholder, multiline, required, readonly }],
+    confirmText:readonly ? 'Zatvori' : 'Potvrdi',
+    cancelText:readonly ? null : 'Odustani'
+  });
+  return result?.value ?? null;
+}
+
 function avatarHtml(user, fallback = 'G') {
   const avatar = String(user?.avatar || '');
   if (/^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(avatar)) {
@@ -71,7 +164,11 @@ function openGame(id) {
 async function handleSidebarAction(action) {
   if (action === 'bot-game') return view('home');
   if (action === 'join-game') {
-    const id = prompt('Unesi kod ili ID partije')?.trim();
+    const id = (await topPrompt('Kod ili ID partije', {
+      title:'Pridruži se partiji',
+      placeholder:'Na primer: a1b2c3d4',
+      required:true
+    }))?.trim();
     if (id) openGame(id);
     return;
   }
@@ -81,7 +178,7 @@ async function handleSidebarAction(action) {
       if (data.playerId) localStorage.topPlayerId = data.playerId;
       openGame(data.id);
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Partija nije napravljena');
     }
   }
 }
@@ -134,19 +231,26 @@ function showMnemonic(phrase, username) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
-      <section class="card mnemonic-modal" role="dialog" aria-modal="true" aria-labelledby="mnemonicTitle">
-        <h2 id="mnemonicTitle">Sačuvaj mnemonic frazu</h2>
-        <p>Ovo je jedini način za oporavak naloga. Fraza se više neće prikazati.</p>
-        <textarea id="mnemonicValue" readonly rows="4">${esc(phrase)}</textarea>
-        <div class="form-actions">
-          <button id="copyMnemonic">Kopiraj frazu</button>
-          <button id="downloadMnemonic">Preuzmi kao .txt</button>
+      <section class="card mnemonic-modal top-dialog" role="dialog" aria-modal="true" aria-labelledby="mnemonicTitle">
+        <header class="top-dialog-header">
+          <img src="/top-logo.svg" alt="">
+          <div><small>TOP</small><h2 id="mnemonicTitle">Sačuvaj mnemonic frazu</h2></div>
+        </header>
+        <div class="top-dialog-body">
+          <p>Ovo je jedini način za oporavak naloga. Fraza se više neće prikazati.</p>
+          <textarea id="mnemonicValue" readonly rows="4">${esc(phrase)}</textarea>
+          <div class="form-actions mnemonic-tools">
+            <button id="copyMnemonic">Kopiraj frazu</button>
+            <button id="downloadMnemonic">Preuzmi kao .txt</button>
+          </div>
+          <label class="confirm-line">
+            <input id="mnemonicSaved" type="checkbox">
+            Sačuvao/la sam frazu na sigurnom mestu
+          </label>
         </div>
-        <label class="confirm-line">
-          <input id="mnemonicSaved" type="checkbox">
-          Sačuvao/la sam frazu na sigurnom mestu
-        </label>
-        <button id="finishRegistration" class="primary" disabled>Nastavi</button>
+        <footer class="top-dialog-actions">
+          <button id="finishRegistration" class="primary" disabled>Nastavi</button>
+        </footer>
       </section>
     `;
     document.body.appendChild(overlay);
@@ -214,23 +318,31 @@ function authPage(registering) {
       }
       view('home');
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, registering ? 'Registracija nije uspela' : 'Prijava nije uspela');
     }
   };
 
   document.querySelector('#recover')?.addEventListener('click', async () => {
-    const username = prompt('Korisničko ime');
-    const mnemonic = prompt('Mnemonic fraza, tačnim redom');
-    const password = prompt('Nova lozinka');
-    if (!username || !mnemonic || !password) return;
+    const credentials = await topDialog({
+      title:'Oporavak naloga',
+      message:'Unesi mnemonic reči tačnim redom. Ovo je jedini način za oporavak naloga.',
+      fields:[
+        { name:'username', label:'Korisničko ime', required:true, autocomplete:'username' },
+        { name:'mnemonic', label:'Mnemonic fraza', required:true, multiline:true, rows:3, placeholder:'sova golub motika…' },
+        { name:'password', label:'Nova lozinka', required:true, type:'password', minlength:8, autocomplete:'new-password' }
+      ],
+      confirmText:'Promeni lozinku',
+      cancelText:'Odustani'
+    });
+    if (!credentials) return;
     try {
       await api('/auth/recover', {
         method: 'POST',
-        body: JSON.stringify({ username, mnemonic, password })
+        body: JSON.stringify(credentials)
       });
-      alert('Lozinka je promenjena.');
+      await topAlert('Lozinka je uspešno promenjena.', 'Nalog je oporavljen');
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Oporavak nije uspeo');
     }
   });
 }
@@ -309,7 +421,7 @@ function homePage() {
       });
     } catch (error) {
       gameId = null;
-      alert(error.message);
+      await topAlert(error.message, 'Bot partija nije pokrenuta');
     } finally {
       starting = false;
       drawHomeGame();
@@ -344,7 +456,7 @@ function homePage() {
         body:JSON.stringify({ move:{ from:selected, to:square, promotion:'q' } })
       });
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Potez nije odigran');
     }
     selected = null;
     drawHomeGame();
@@ -360,7 +472,7 @@ async function friendsPage() {
   try {
     [friends, challenges] = await Promise.all([api('/friends'), api('/challenges')]);
   } catch (error) {
-    alert(error.message);
+    await topAlert(error.message, 'Podaci nisu učitani');
   }
 
   layout(`
@@ -424,11 +536,11 @@ async function friendsPage() {
             method: 'POST',
             body: JSON.stringify({ userId: button.dataset.add })
           });
-          alert('Zahtev poslat.');
+          await topAlert('Zahtev za prijateljstvo je poslat.', 'Zahtev poslat');
         };
       });
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Pretraga nije uspela');
     }
   };
 
@@ -439,9 +551,9 @@ async function friendsPage() {
           method: 'POST',
           body: JSON.stringify({ userId: button.dataset.challenge })
         });
-        alert('Izazov poslat.');
+        await topAlert('Prijatelj će dobiti obaveštenje o izazovu.', 'Izazov poslat');
       } catch (error) {
-        alert(error.message);
+        await topAlert(error.message, 'Izazov nije poslat');
       }
     };
   });
@@ -454,7 +566,7 @@ async function friendsPage() {
         });
         openGame(data.gameId);
       } catch (error) {
-        alert(error.message);
+        await topAlert(error.message, 'Izazov nije prihvaćen');
       }
     };
   });
@@ -478,14 +590,18 @@ async function friendsPage() {
   });
   document.querySelectorAll('[data-remove-friend]').forEach(button => {
     button.onclick = async () => {
-      if (!confirm('Ukloniti prijatelja?')) return;
+      if (!await topConfirm('Ovaj korisnik više neće biti na tvojoj listi prijatelja.', {
+        title:'Ukloni prijatelja', confirmText:'Ukloni', danger:true
+      })) return;
       await api(`/friends/${button.dataset.removeFriend}`, { method: 'DELETE' });
       friendsPage();
     };
   });
   document.querySelectorAll('[data-block-friend]').forEach(button => {
     button.onclick = async () => {
-      if (!confirm('Blokirati ovog korisnika?')) return;
+      if (!await topConfirm('Korisnik neće moći da ti šalje zahteve i izazove.', {
+        title:'Blokiraj korisnika', confirmText:'Blokiraj', danger:true
+      })) return;
       await api('/friends/block', {
         method: 'POST',
         body: JSON.stringify({ userId: button.dataset.blockFriend })
@@ -509,7 +625,7 @@ async function friendsPage() {
       event.target.reset();
       loadFeed();
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Status nije objavljen');
     }
   };
 
@@ -531,19 +647,25 @@ async function friendsPage() {
         button.textContent = `♥ ${status.likes}`;
       }
       if (button.dataset.feedAction === 'edit') {
-        const body = prompt('Izmeni status', status.body)?.trim();
+        const body = (await topPrompt('Tekst statusa', {
+          title:'Izmeni status', value:status.body, multiline:true, required:true
+        }))?.trim();
         if (!body) return;
         await api(`/statuses/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
         status.body = body;
         article.querySelector('[data-status-body]').textContent = body;
       }
       if (button.dataset.feedAction === 'delete') {
-        if (!confirm('Obrisati status?')) return;
+        if (!await topConfirm('Obrisani status se ne može vratiti.', {
+          title:'Obriši status', confirmText:'Obriši', danger:true
+        })) return;
         await api(`/statuses/${id}`, { method: 'DELETE' });
         article.remove();
       }
       if (button.dataset.feedAction === 'reply') {
-        const body = prompt('Napiši odgovor')?.trim();
+        const body = (await topPrompt('Odgovor', {
+          title:'Odgovori na status', multiline:true, required:true
+        }))?.trim();
         if (!body) return;
         await api(`/statuses/${id}/replies`, {
           method: 'POST',
@@ -555,7 +677,11 @@ async function friendsPage() {
         `).join('');
       }
       if (button.dataset.feedAction === 'report') {
-        const reason = prompt('Razlog prijave (opciono)')?.trim() || '';
+        const enteredReason = await topPrompt('Razlog prijave (opciono)', {
+          title:'Prijavi status', multiline:true
+        });
+        if (enteredReason === null) return;
+        const reason = enteredReason.trim();
         await api(`/statuses/${id}/report`, {
           method: 'POST',
           body: JSON.stringify({ reason })
@@ -564,7 +690,7 @@ async function friendsPage() {
         button.disabled = true;
       }
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Radnja nije uspela');
     }
   };
 
@@ -741,7 +867,7 @@ async function profilePage() {
       avatar = await resizeAvatar(event.target.files[0]);
       avatarPreview.innerHTML = `<img src="${avatar}" alt="Profilna slika">`;
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Slika nije učitana');
     }
   };
   document.querySelector('#removeAvatar').onclick = () => {
@@ -841,7 +967,8 @@ async function profilePage() {
 
   document.querySelector('#saveMoveSequences').onclick = async () => {
     if (whiteEditor.getMoves().length !== 5 || blackEditor.getMoves().length !== 5) {
-      return alert('Unesi tačno pet poteza i za bele i za crne figure.');
+      await topAlert('Unesi tačno pet poteza i za bele i za crne figure.', 'Sekvence nisu kompletne');
+      return;
     }
     try {
       await api('/profile/secret-moves', {
@@ -852,21 +979,28 @@ async function profilePage() {
       });
       document.querySelector('#profileMessage').textContent = 'Potezi za obe boje su sačuvani.';
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Sekvence nisu sačuvane');
     }
   };
   document.querySelector('#changePassword').onclick = async () => {
-    const currentPassword = prompt('Trenutna lozinka');
-    const newPassword = prompt('Nova lozinka');
-    if (!currentPassword || !newPassword) return;
+    const passwords = await topDialog({
+      title:'Promeni lozinku',
+      fields:[
+        { name:'currentPassword', label:'Trenutna lozinka', type:'password', required:true, autocomplete:'current-password' },
+        { name:'newPassword', label:'Nova lozinka', type:'password', required:true, minlength:8, autocomplete:'new-password' }
+      ],
+      confirmText:'Sačuvaj lozinku',
+      cancelText:'Odustani'
+    });
+    if (!passwords) return;
     try {
       await api('/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ currentPassword, newPassword })
+        body: JSON.stringify(passwords)
       });
-      alert('Lozinka je promenjena.');
+      await topAlert('Nova lozinka je sačuvana.', 'Lozinka je promenjena');
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Lozinka nije promenjena');
     }
   };
   try {
@@ -930,7 +1064,7 @@ async function gamePage(id) {
     gameId = joined.id || gameId;
     if (joined.playerId) localStorage.topPlayerId = joined.playerId;
   } catch (error) {
-    alert(error.message);
+    await topAlert(error.message, 'Ulazak u partiju nije uspeo');
     history.replaceState(null, '', location.pathname);
     return view('home');
   }
@@ -939,7 +1073,7 @@ async function gamePage(id) {
   try {
     state = await api(`/games/${gameId}`);
   } catch (error) {
-    alert(error.message);
+    await topAlert(error.message, 'Partija nije učitana');
     return view('home');
   }
   let selected = null;
@@ -955,7 +1089,9 @@ async function gamePage(id) {
       await navigator.clipboard.writeText(gameId.slice(0, 8));
       document.querySelector('#copyGame').textContent = 'Kopirano';
     } catch {
-      prompt('Kopiraj kod partije', gameId.slice(0, 8));
+      await topPrompt('Kod partije', {
+        title:'Kopiraj kod', value:gameId.slice(0, 8), readonly:true
+      });
     }
   };
 
@@ -1020,7 +1156,7 @@ async function gamePage(id) {
         body: JSON.stringify({ move: { from: selected, to: square, promotion: 'q' } })
       });
     } catch (error) {
-      alert(error.message);
+      await topAlert(error.message, 'Potez nije odigran');
     }
     selected = null;
     render();
@@ -1039,7 +1175,9 @@ async function gamePage(id) {
   });
   socket.on('draw-offer', async ({ offeredBy } = {}) => {
     if (offeredBy === currentPlayerId()) return;
-    if (!confirm('Protivnik nudi remi. Prihvati?')) {
+    if (!await topConfirm('Protivnik nudi da se partija završi nerešeno.', {
+      title:'Ponuda remija', confirmText:'Prihvati remi'
+    })) {
       await api(`/games/${gameId}/draw-decline`, { method: 'POST', body: '{}' });
       return;
     }
@@ -1064,7 +1202,9 @@ async function gamePage(id) {
     if (event.key === 'Enter') sendMessage();
   };
   document.querySelector('#resign').onclick = async () => {
-    if (!confirm('Da li sigurno predaješ partiju?')) return;
+    if (!await topConfirm('Partija će se odmah završiti pobedom protivnika.', {
+      title:'Predaj partiju', confirmText:'Predaj', danger:true
+    })) return;
     state = await api(`/games/${gameId}/resign`, { method: 'POST', body: '{}' });
     render();
   };
