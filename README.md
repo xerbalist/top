@@ -14,7 +14,10 @@ Otvori `http://localhost:8080`.
 
 Poveži ovaj GitHub repository kao Docker Compose projekat. Aplikacija koristi port `8080`. PostgreSQL servis i inicijalna šema nalaze se u `docker-compose.yml` i `schema.sql`.
 
-Pre produkcije promeni `JWT_SECRET`, `MNEMONIC_PEPPER` i `ANONYMOUS_SECRET_MOVES` u environment podešavanjima.
+Pre produkcije promeni `POSTGRES_PASSWORD`, `JWT_SECRET`,
+`MNEMONIC_PEPPER` i `ANONYMOUS_SECRET_MOVES` u environment podešavanjima.
+Sesija koristi `HttpOnly` i `SameSite=Lax` cookie, a preko Coolify HTTPS
+proxy-ja automatski dobija i `Secure` oznaku.
 
 Coolify health-check koristi `GET /api/health` na portu `8080` i proverava dostupnost PostgreSQL baze.
 
@@ -22,4 +25,6 @@ Za GitHub/Coolify koristi privatni repository i nikada ne postavljaj `.env` fajl
 
 ## Privatnost tajnog četa
 
-Poruke tajnog četa postoje samo u RAM-u aktivne partije. Ne upisuju se u PostgreSQL, fajlove ili logove i brišu se kada se partija završi ili server restartuje.
+Server poruke samo prosleđuje trenutno povezanim igračima. Ne zadržava ih ni u
+RAM nizu, niti ih upisuje u PostgreSQL, fajlove, logove, analitiku ili backup.
+Kada se partija završi, slanje poruka se odmah onemogućava.

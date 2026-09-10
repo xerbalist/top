@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --check server.js && node --check public/app.js && node --check public/game-controls.js && node --check public/profile-controls.js && node --check public/social-controls.js"
+    "test": "node --check server.js && node --check public/app.js && node --test"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
