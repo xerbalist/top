@@ -2,6 +2,15 @@
 
 TOP je Coolify-ready Node.js aplikacija na srpskom jeziku. Koristi `chess.js`, Express, Socket.IO i PostgreSQL.
 
+Početna strana uvek prikazuje šahovsku tablu. Registrovani korisnik u profilu
+unosi dve nezavisne sekvence od po pet poteza: jednu za bele i jednu za crne
+figure. Kada prijatelj prihvati izazov, oba trenutno povezana igrača automatski
+se prebacuju u novu partiju.
+
+Mnemonic fraza se pravi isključivo od srpskih reči koje se izvorno pišu bez
+dijakritika. Prikazuje se samo jednom, neposredno posle registracije, kada može
+da se kopira ili preuzme kao tekstualni fajl.
+
 ## Pokretanje
 
 ```bash

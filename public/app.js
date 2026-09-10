@@ -1,6 +1,7 @@
 const root = document.querySelector('#root');
 let me = JSON.parse(localStorage.topUser || 'null');
 let activeSocket = null;
+let accountSocket = null;
 
 const esc = value => String(value).replace(
   /[&<>"']/g,
@@ -28,6 +29,7 @@ function layout(content) {
   root.innerHTML = content;
   const authButton = document.querySelector('#authBtn');
   authButton.textContent = me ? 'Odjava' : 'Prijava';
+  authButton.dataset.view = me ? 'logout' : 'login';
   document.querySelectorAll('[data-view]').forEach(button => {
     button.onclick = () => navigate(button.dataset.view);
   });
@@ -43,6 +45,21 @@ function openGame(id) {
   else location.hash = id;
 }
 
+function syncAccountSocket() {
+  if (!me) {
+    accountSocket?.disconnect();
+    accountSocket = null;
+    return;
+  }
+  if (accountSocket) return;
+  accountSocket = io();
+  accountSocket.on('challenge-accepted', ({ gameId } = {}) => {
+    if (!gameId) return;
+    localStorage.removeItem('topPlayerId');
+    openGame(gameId);
+  });
+}
+
 function view(viewName = 'home') {
   if (viewName === 'logout') {
     api('/auth/logout', { method: 'POST', body: '{}' }).catch(() => {});
@@ -50,6 +67,7 @@ function view(viewName = 'home') {
     localStorage.removeItem('topUser');
     localStorage.removeItem('topPlayerId');
     me = null;
+    syncAccountSocket();
     return view('home');
   }
   if (viewName === 'login') return authPage(false);
@@ -60,7 +78,7 @@ function view(viewName = 'home') {
   return homePage();
 }
 
-function showMnemonic(phrase) {
+function showMnemonic(phrase, username) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -71,6 +89,7 @@ function showMnemonic(phrase) {
         <textarea id="mnemonicValue" readonly rows="4">${esc(phrase)}</textarea>
         <div class="form-actions">
           <button id="copyMnemonic">Kopiraj frazu</button>
+          <button id="downloadMnemonic">Preuzmi kao .txt</button>
         </div>
         <label class="confirm-line">
           <input id="mnemonicSaved" type="checkbox">
@@ -91,6 +110,15 @@ function showMnemonic(phrase) {
       } catch {
         overlay.querySelector('#mnemonicValue').select();
       }
+    };
+    overlay.querySelector('#downloadMnemonic').onclick = () => {
+      const content = `TOP — mnemonic fraza za oporavak\nKorisničko ime: ${username}\n\n${phrase}\n\nČuvaj ovaj fajl na sigurnom mestu.`;
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `TOP-mnemonic-${username}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
     };
     finish.onclick = () => {
       overlay.remove();
@@ -129,8 +157,9 @@ function authPage(registering) {
       localStorage.removeItem('topToken');
       localStorage.removeItem('topPlayerId');
       localStorage.topUser = JSON.stringify(me);
+      syncAccountSocket();
       if (data.mnemonic) {
-        await showMnemonic(data.mnemonic);
+        await showMnemonic(data.mnemonic, data.user.username);
       }
       view('home');
     } catch (error) {
@@ -157,16 +186,16 @@ function authPage(registering) {
 
 function homePage() {
   layout(`
-    <section class="grid">
-      <div class="card">
+    <section class="home-chess">
+      <div id="homeBoard" class="board preview-board" aria-label="Početna šahovska tabla"></div>
+      <div class="card home-actions">
         <h1>TOP ♜</h1>
         <p>Jednostavan šah sa prijateljima.</p>
         <div class="form-actions">
           <button class="primary" id="new">Nova partija</button>
           <button id="join">Pridruži se partiji</button>
         </div>
-      </div>
-      <div class="card">
+        <hr>
         <h2>${me ? `Zdravo, ${esc(me.username)}` : 'Igraj anonimno'}</h2>
         <p class="muted">
           ${me ? 'Poveži se sa prijateljima i objavi status.' : 'Možeš igrati bez registracije.'}
@@ -174,6 +203,13 @@ function homePage() {
       </div>
     </section>
   `);
+
+  renderBoard(
+    document.querySelector('#homeBoard'),
+    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    null,
+    () => {}
+  );
 
   document.querySelector('#new').onclick = async () => {
     try {
@@ -476,79 +512,120 @@ async function profilePage() {
     <section class="card">
       <h1>Profil</h1>
       <p>Korisničko ime: <b>${esc(me.username)}</b></p>
-      <h2>Pet poteza</h2>
-      <p class="muted">
-        Unesi pet svojih poteza iz perspektive belog. Ako igraš crnim,
-        potezi se automatski preslikavaju na tvoju stranu table.
-      </p>
-      <div class="grid">
-        <div id="secretBoard" class="board"></div>
-        <div>
-          <div id="secretMoves" class="moves">Nema unetih poteza.</div>
-          <div class="form-actions" style="margin-top:12px">
-            <button id="resetSecret">Poništi</button>
-            <button id="saveSecret" class="primary">Sačuvaj pet poteza</button>
-            <button id="changePassword">Promeni lozinku</button>
-          </div>
-          <p id="secretMessage" class="muted"></p>
-        </div>
+      <p class="muted">Unesi dve odvojene sekvence. Potezi moraju biti odigrani tačno prikazanim redom.</p>
+      <div class="sequence-grid">
+        <section class="sequence-editor">
+          <h2>Potezi za bele figure</h2>
+          <p class="muted">Odaberi tačno pet poteza belih figura.</p>
+          <div id="whiteMovesBoard" class="board profile-board"></div>
+          <div id="whiteMovesList" class="moves">Nema unetih poteza.</div>
+          <button id="resetWhiteMoves">Poništi bele poteze</button>
+          <p id="whiteMovesMessage" class="muted sequence-message"></p>
+        </section>
+        <section class="sequence-editor">
+          <h2>Potezi za crne figure</h2>
+          <p class="muted">Odaberi tačno pet poteza crnih figura.</p>
+          <div id="blackMovesBoard" class="board profile-board"></div>
+          <div id="blackMovesList" class="moves">Nema unetih poteza.</div>
+          <button id="resetBlackMoves">Poništi crne poteze</button>
+          <p id="blackMovesMessage" class="muted sequence-message"></p>
+        </section>
       </div>
+      <div class="form-actions profile-actions">
+        <button id="saveMoveSequences" class="primary">Sačuvaj obe sekvence</button>
+        <button id="changePassword">Promeni lozinku</button>
+      </div>
+      <p id="profileMessage" class="muted"></p>
     </section>
   `);
 
   const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-  let sequence = [];
-  let fen = initialFen;
-  let selected = null;
 
-  const draw = () => {
-    renderBoard(document.querySelector('#secretBoard'), fen, selected, pick);
-    document.querySelector('#secretMoves').innerHTML = sequence.length
-      ? sequence.map((move, index) => `${index + 1}. ${esc(move.san)}`).join('<br>')
-      : 'Nema unetih poteza.';
-  };
+  function createSequenceEditor(color) {
+    const prefix = color === 'w' ? 'whiteMoves' : 'blackMoves';
+    const board = document.querySelector(`#${prefix}Board`);
+    const list = document.querySelector(`#${prefix}List`);
+    const message = document.querySelector(`#${prefix}Message`);
+    let sequence = [];
+    let fen = initialFen;
+    let selected = null;
 
-  async function pick(square) {
-    if (!selected) {
-      selected = square;
+    const draw = () => {
+      renderBoard(board, fen, selected, pick, color);
+      list.innerHTML = sequence.length
+        ? sequence.map((move, index) => color === 'w'
+          ? `${index + 1}. ${esc(move.san)}`
+          : `${index + 1}... ${esc(move.san)}`).join('<br>')
+        : 'Nema unetih poteza.';
+    };
+
+    async function pick(square) {
+      if (sequence.length >= 5) {
+        message.textContent = 'Već je uneto pet poteza. Poništi sekvencu da uneseš novu.';
+        return;
+      }
+      if (!selected) {
+        selected = square;
+        draw();
+        return;
+      }
+      try {
+        const data = await api('/profile/secret-moves/validate', {
+          method: 'POST',
+          body: JSON.stringify({
+            color,
+            moves: [...sequence, { from: selected, to: square, promotion: 'q' }]
+          })
+        });
+        sequence = data.history;
+        fen = data.fen;
+        selected = null;
+        message.textContent = data.complete ? 'Pet poteza je spremno.' : '';
+      } catch (error) {
+        selected = null;
+        message.textContent = error.message;
+      }
       draw();
-      return;
     }
-    try {
+
+    async function load(moves) {
+      if (!Array.isArray(moves) || !moves.length) return draw();
       const data = await api('/profile/secret-moves/validate', {
         method: 'POST',
-        body: JSON.stringify({
-          moves: [...sequence, { from: selected, to: square, promotion: 'q' }]
-        })
+        body: JSON.stringify({ color, moves })
       });
       sequence = data.history;
       fen = data.fen;
-      selected = null;
-      document.querySelector('#secretMessage').textContent = data.complete
-        ? 'Sekvenca je spremna za čuvanje.'
-        : '';
-    } catch (error) {
-      selected = null;
-      document.querySelector('#secretMessage').textContent = error.message;
+      message.textContent = sequence.length === 5 ? 'Pet poteza je sačuvano.' : '';
+      draw();
     }
+
+    document.querySelector(`#reset${color === 'w' ? 'White' : 'Black'}Moves`).onclick = () => {
+      sequence = [];
+      fen = initialFen;
+      selected = null;
+      message.textContent = '';
+      draw();
+    };
     draw();
+    return { getMoves: () => sequence, load };
   }
 
-  document.querySelector('#resetSecret').onclick = () => {
-    sequence = [];
-    fen = initialFen;
-    selected = null;
-    document.querySelector('#secretMessage').textContent = '';
-    draw();
-  };
-  document.querySelector('#saveSecret').onclick = async () => {
-    if (sequence.length !== 5) return alert('Unesi tačno pet poteza.');
+  const whiteEditor = createSequenceEditor('w');
+  const blackEditor = createSequenceEditor('b');
+
+  document.querySelector('#saveMoveSequences').onclick = async () => {
+    if (whiteEditor.getMoves().length !== 5 || blackEditor.getMoves().length !== 5) {
+      return alert('Unesi tačno pet poteza i za bele i za crne figure.');
+    }
     try {
       await api('/profile/secret-moves', {
         method: 'PUT',
-        body: JSON.stringify({ moves: sequence })
+        body: JSON.stringify({
+          moves: { w: whiteEditor.getMoves(), b: blackEditor.getMoves() }
+        })
       });
-      document.querySelector('#secretMessage').textContent = 'Pet poteza je sačuvano.';
+      document.querySelector('#profileMessage').textContent = 'Potezi za obe boje su sačuvani.';
     } catch (error) {
       alert(error.message);
     }
@@ -567,18 +644,12 @@ async function profilePage() {
       alert(error.message);
     }
   };
-  draw();
   try {
     const saved = await api('/profile/secret-moves');
-    if (saved.moves?.length) {
-      const validated = await api('/profile/secret-moves/validate', {
-        method: 'POST',
-        body: JSON.stringify({ moves: saved.moves })
-      });
-      sequence = validated.history;
-      fen = validated.fen;
-      draw();
-    }
+    await Promise.all([
+      whiteEditor.load(saved.moves?.w),
+      blackEditor.load(saved.moves?.b)
+    ]);
   } catch {}
 }
 
@@ -740,6 +811,7 @@ async function boot() {
       localStorage.removeItem('topUser');
     }
   }
+  syncAccountSocket();
   view(location.hash ? 'game' : 'home');
 }
 

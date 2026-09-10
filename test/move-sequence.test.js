@@ -21,6 +21,18 @@ test('validates five consecutive moves by the same white side', () => {
   assert.deepEqual(result.history.map(move => move.san), ['e4', 'Nf3', 'Bb5', 'O-O', 'Qe2']);
 });
 
+test('validates an independent sequence for black pieces', () => {
+  const result = validatePersonalSequence([
+    { from: 'e7', to: 'e5' },
+    { from: 'g8', to: 'f6' },
+    { from: 'f8', to: 'b4' },
+    { from: 'e8', to: 'g8' },
+    { from: 'd8', to: 'e7' }
+  ], 5, 'b');
+  assert.equal(result.history.length, 5);
+  assert.deepEqual(result.history.map(move => move.san), ['e5', 'Nf6', 'Bb4', 'O-O', 'Qe7']);
+});
+
 test('mirrors a stored white move for a black player', () => {
   assert.equal(mirrorSquare('e2'), 'e7');
   assert.deepEqual(
@@ -39,4 +51,5 @@ test('tracks exact order and can restart from the first move', () => {
 test('rejects illegal personal moves', () => {
   assert.throws(() => validatePersonalSequence([{ from: 'e2', to: 'e5' }]));
   assert.throws(() => validatePersonalSequence([{ from: 'e7', to: 'e5' }]));
+  assert.throws(() => validatePersonalSequence([{ from: 'e2', to: 'e4' }], 5, 'b'));
 });

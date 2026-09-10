@@ -98,6 +98,29 @@ button:focus-visible {
   gap: 18px;
 }
 
+.home-chess {
+  display: grid;
+  grid-template-columns: minmax(320px, 640px) minmax(260px, 340px);
+  gap: 18px;
+  align-items: start;
+  justify-content: center;
+}
+
+.home-actions {
+  position: sticky;
+  top: 18px;
+}
+
+.home-actions hr {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid #444;
+}
+
+.preview-board .sq {
+  cursor: default;
+}
+
 .card {
   padding: 22px;
   border-radius: 12px;
@@ -235,6 +258,39 @@ form {
   background: var(--panel-dark);
 }
 
+.sequence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.sequence-editor {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #484641;
+  border-radius: 10px;
+  background: var(--panel-dark);
+}
+
+.profile-board {
+  width: 100%;
+  border-width: 5px;
+}
+
+.sequence-editor .moves {
+  min-height: 132px;
+  background: #111;
+}
+
+.sequence-message {
+  min-height: 24px;
+}
+
+.profile-actions {
+  margin-top: 22px;
+}
+
 .chat {
   margin-top: 12px;
 }
@@ -287,8 +343,14 @@ form {
 }
 
 @media (max-width: 800px) {
-  .chess {
+  .chess,
+  .home-chess,
+  .sequence-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-actions {
+    position: static;
   }
 
   header {
