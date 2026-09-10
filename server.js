@@ -48,12 +48,12 @@ const words = [...new Set(`
   paket motor tunel balkon podrum krov zid
 `.trim().split(/\s+/))];
 if (words.some(word => !/^[a-z]+$/.test(word))) throw new Error('Mnemonic rečnik sadrži nedozvoljenu reč.');
-app.use(express.json({ limit: '32kb' })); app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '512kb' })); app.use(express.static(path.join(__dirname, 'public')));
 app.use((req,res,next)=>{ const key=`${req.ip}:${req.path}`; const now=Date.now(); const recent=(requestBuckets.get(key)||[]).filter(t=>now-t<60000); if(recent.length>=120)return res.status(429).json({error:'Previše zahteva. Pokušaj ponovo za minut.'}); recent.push(now); requestBuckets.set(key,recent); next(); });
 const parseCookies = header => Object.fromEntries(String(header||'').split(';').map(item=>item.trim()).filter(Boolean).map(item=>{const at=item.indexOf('=');return at<0?[item,'']:[item.slice(0,at),decodeURIComponent(item.slice(at+1))]}));
 const requestToken = req => (req.headers.authorization||'').replace('Bearer ','') || parseCookies(req.headers.cookie).top_session || '';
 const sessionCookie = (token,maxAge=2592000,secure=false) => `top_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure?'; Secure':''}`;
-const createToken = user => jwt.sign(user,JWT_SECRET,{expiresIn:'30d'});
+const createToken = user => jwt.sign({id:user.id,username:user.username},JWT_SECRET,{expiresIn:'30d'});
 const auth = (req,res,next)=>{ try { req.user=jwt.verify(requestToken(req),JWT_SECRET); next(); } catch { res.status(401).json({error:'Potrebna je prijava.'}); } };
 const optionalAuth = (req,res,next)=>{ try { const token=requestToken(req); if(token) req.user=jwt.verify(token,JWT_SECRET); } catch {} next(); };
 const identity = req=>req.user?.id || req.headers['x-player-id'] || null;
@@ -70,7 +70,7 @@ const normaliseSecretMoves = value => {
 };
 const q = async (text, values=[])=>{ if(!pool){const error=new Error('PostgreSQL nije podešen.');error.code='DB_NOT_CONFIGURED';throw error} return pool.query(text,values); };
 const databaseUnavailable = error => !pool || error?.code==='DB_NOT_CONFIGURED' || error?.code==='ECONNREFUSED' || String(error?.code||'').startsWith('08');
-const safeUser = r=>({id:r.id,username:r.username,createdAt:r.created_at});
+const safeUser = r=>({id:r.id,username:r.username,avatar:r.avatar_data||'',bio:r.bio||'',country:r.country||'',createdAt:r.created_at});
 const endReason = chess => {
   if (chess.isCheckmate()) return 'mat';
   if (chess.isStalemate()) return 'pat';
@@ -102,7 +102,8 @@ app.post('/api/auth/login',async(req,res)=>{ try { const r=await q('SELECT * FRO
 app.post('/api/auth/logout',(req,res)=>{ res.setHeader('Set-Cookie',sessionCookie('',0,req.secure)); res.json({ok:true}); });
 app.post('/api/auth/recover',async(req,res)=>{ try { const phrase=(req.body.mnemonic||'').trim().toLowerCase(); if(!/^[a-z ]+$/.test(phrase)) return res.status(400).json({error:'Mnemonic fraza sme sadržati samo slova bez dijakritike.'}); const r=await q('SELECT * FROM users WHERE lower(username)=lower($1) AND mnemonic_hash=$2',[req.body.username,hashMnemonic(phrase)]); if(!r.rows[0]) return res.status(400).json({error:'Podaci za oporavak nisu ispravni.'}); await q('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(req.body.password,12),r.rows[0].id]); res.json({ok:true}); } catch { res.status(500).json({error:'Oporavak nije uspeo.'}); }});
 app.post('/api/auth/change-password',auth,async(req,res)=>{ try { const current=String(req.body.currentPassword||''); const next=String(req.body.newPassword||''); if(next.length<8)return res.status(400).json({error:'Nova lozinka mora imati najmanje 8 karaktera.'}); const r=await q('SELECT password_hash FROM users WHERE id=$1',[req.user.id]); if(!r.rows[0]||!(await bcrypt.compare(current,r.rows[0].password_hash)))return res.status(400).json({error:'Trenutna lozinka nije ispravna.'}); await q('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(next,12),req.user.id]); res.json({ok:true}); } catch { res.status(500).json({error:'Promena lozinke nije uspela.'}); }});
-app.get('/api/me',auth,async(req,res)=>{ const r=await q('SELECT id,username,created_at FROM users WHERE id=$1',[req.user.id]); res.json(safeUser(r.rows[0])); });
+app.get('/api/me',auth,async(req,res)=>{ const r=await q('SELECT id,username,avatar_data,bio,country,created_at FROM users WHERE id=$1',[req.user.id]); res.json(safeUser(r.rows[0])); });
+app.patch('/api/profile',auth,async(req,res)=>{ try { const avatar=String(req.body.avatar||''); const bio=String(req.body.bio||'').trim(); const country=String(req.body.country||'').trim(); if(avatar.length>300000||avatar&&!/^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(avatar))return res.status(400).json({error:'Profilna slika nije ispravna ili je prevelika.'}); if(bio.length>280)return res.status(400).json({error:'Biografija može imati najviše 280 karaktera.'}); if(country.length>80)return res.status(400).json({error:'Naziv države je predugačak.'}); const r=await q('UPDATE users SET avatar_data=$1,bio=$2,country=$3 WHERE id=$4 RETURNING id,username,avatar_data,bio,country,created_at',[avatar,bio,country,req.user.id]); res.json(safeUser(r.rows[0])); } catch(e) { res.status(databaseUnavailable(e)?503:500).json({error:'Profil nije sačuvan.'}); }});
 app.get('/api/profile/secret-moves',auth,async(req,res)=>{ const r=await q('SELECT secret_moves FROM users WHERE id=$1',[req.user.id]); res.json({moves:normaliseSecretMoves(r.rows[0]?.secret_moves)}); });
 app.post('/api/profile/secret-moves/validate',auth,async(req,res)=>{ try { const moves=Array.isArray(req.body.moves)?req.body.moves:[]; const color=req.body.color==='b'?'b':'w'; const result=validatePersonalSequence(moves,5,color); res.json({valid:true,complete:moves.length===5,fen:result.fen,history:result.history,color}); } catch { res.status(400).json({valid:false,error:'Sekvenca sadrži nelegalan potez.'}); }});
 app.put('/api/profile/secret-moves',auth,async(req,res)=>{ try { const moves=normaliseSecretMoves(req.body.moves); if(moves.w.length!==5||moves.b.length!==5) return res.status(400).json({error:'Unesi tačno pet legalnih poteza i za bele i za crne figure.'}); const result={w:validatePersonalSequence(moves.w,5,'w').history,b:validatePersonalSequence(moves.b,5,'b').history}; await q('UPDATE users SET secret_moves=$1 WHERE id=$2',[JSON.stringify(result),req.user.id]); res.json({ok:true,message:'Obe sekvence su sačuvane.'}); } catch { res.status(400).json({error:'Potezi nisu sačuvani. Proveri obe sekvence.'}); }});

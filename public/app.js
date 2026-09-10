@@ -2,11 +2,28 @@ const root = document.querySelector('#root');
 let me = JSON.parse(localStorage.topUser || 'null');
 let activeSocket = null;
 let accountSocket = null;
+let loggingOut = false;
 
 const esc = value => String(value).replace(
   /[&<>"']/g,
   character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
 );
+
+function avatarHtml(user, fallback = 'G') {
+  const avatar = String(user?.avatar || '');
+  if (/^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(avatar)) {
+    return `<img src="${avatar}" alt="">`;
+  }
+  return esc(user?.username?.[0]?.toUpperCase() || fallback);
+}
+
+function updateSidebarUser() {
+  const userButton = document.querySelector('#sidebarUser');
+  document.querySelector('#sidebarAvatar').innerHTML = avatarHtml(me);
+  document.querySelector('#sidebarUsername').textContent = me?.username || 'Gost';
+  document.querySelector('#sidebarCountry').textContent = me?.country || (me ? 'TOP igrač' : 'Bez naloga');
+  userButton.dataset.view = me ? 'profile' : 'login';
+}
 
 async function api(url, options = {}) {
   const response = await fetch(`/api${url}`, {
@@ -28,10 +45,16 @@ function layout(content) {
   activeSocket = null;
   root.innerHTML = content;
   const authButton = document.querySelector('#authBtn');
-  authButton.textContent = me ? 'Odjava' : 'Prijava';
+  authButton.innerHTML = me
+    ? '<span class="nav-icon">↪</span><span>Odjava</span>'
+    : '<span class="nav-icon">●</span><span>Prijava</span>';
   authButton.dataset.view = me ? 'logout' : 'login';
+  updateSidebarUser();
   document.querySelectorAll('[data-view]').forEach(button => {
     button.onclick = () => navigate(button.dataset.view);
+  });
+  document.querySelectorAll('[data-action]').forEach(button => {
+    button.onclick = () => handleSidebarAction(button.dataset.action);
   });
 }
 
@@ -43,6 +66,39 @@ function navigate(viewName) {
 function openGame(id) {
   if (location.hash.slice(1) === id) gamePage(id);
   else location.hash = id;
+}
+
+async function handleSidebarAction(action) {
+  if (action === 'bot-game') return view('home');
+  if (action === 'join-game') {
+    const id = prompt('Unesi kod ili ID partije')?.trim();
+    if (id) openGame(id);
+    return;
+  }
+  if (action === 'new-game') {
+    try {
+      const data = await api('/games', { method:'POST', body:'{}' });
+      if (data.playerId) localStorage.topPlayerId = data.playerId;
+      openGame(data.id);
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+}
+
+async function performLogout() {
+  if (loggingOut) return;
+  loggingOut = true;
+  try {
+    await api('/auth/logout', { method:'POST', body:'{}' });
+  } catch {}
+  localStorage.removeItem('topToken');
+  localStorage.removeItem('topUser');
+  localStorage.removeItem('topPlayerId');
+  me = null;
+  syncAccountSocket();
+  loggingOut = false;
+  view('home');
 }
 
 function syncAccountSocket() {
@@ -63,13 +119,7 @@ function syncAccountSocket() {
 function view(viewName = 'home') {
   document.body.dataset.page = viewName;
   if (viewName === 'logout') {
-    api('/auth/logout', { method: 'POST', body: '{}' }).catch(() => {});
-    localStorage.removeItem('topToken');
-    localStorage.removeItem('topUser');
-    localStorage.removeItem('topPlayerId');
-    me = null;
-    syncAccountSocket();
-    return view('home');
+    return performLogout();
   }
   if (viewName === 'login') return authPage(false);
   if (viewName === 'register') return authPage(true);
@@ -191,70 +241,116 @@ function homePage() {
       <div class="board-column home-board-column">
         <div class="player-bar">
           <span class="player-avatar bot-avatar">♞</span>
-          <span><b>TOP Bot</b><small>uvek spreman</small></span>
+          <span><b>TOP Bot</b><small id="homeOpponentStatus">lagani nivo</small></span>
           <span class="online-dot" title="Dostupan"></span>
         </div>
-        <div id="homeBoard" class="board preview-board" aria-label="Početna šahovska tabla"></div>
+        <div id="homeBoard" class="board" aria-label="Tabla za igru protiv TOP Bota"></div>
         <div class="player-bar">
-          <span class="player-avatar">${me ? esc(me.username[0].toUpperCase()) : 'G'}</span>
-          <span><b>${me ? esc(me.username) : 'Gost'}</b><small>${me ? 'spreman za partiju' : 'igraj bez naloga'}</small></span>
+          <span class="player-avatar">${avatarHtml(me)}</span>
+          <span><b>${me ? esc(me.username) : 'Gost'}</b><small>${me ? 'igraš belim figurama' : 'igraj bez naloga'}</small></span>
         </div>
       </div>
-      <div class="card home-actions">
-        <span class="eyebrow">DOBRO DOŠAO U TOP</span>
-        <h1>Igraj šah.<br><span>Igraj pametno.</span></h1>
-        <p class="hero-copy">Brza partija bez sata, protiv prijatelja, anonimnog igrača ili našeg laganog bota.</p>
-        <div class="play-options">
-          <button class="primary play-option" id="botGame">
-            <span class="option-icon">♞</span>
-            <span><b>Igraj protiv bota</b><small>Počni odmah kao beli</small></span>
-          </button>
-          <button class="play-option" id="new">
-            <span class="option-icon">♟</span>
-            <span><b>Nova partija</b><small>Podeli kod sa protivnikom</small></span>
-          </button>
-          <button class="play-option subtle" id="join">
-            <span class="option-icon">➜</span>
-            <span><b>Unesi kod partije</b><small>Pridruži se postojećoj partiji</small></span>
-          </button>
+      <aside class="card home-actions bot-home-panel">
+        <div class="game-panel-title home-panel-title">
+          <span class="panel-rook">♞</span>
+          <div><h2>Partija protiv TOP Bota</h2><small>Igraš belim figurama</small></div>
         </div>
-        <div class="home-note">
-          <span class="pulse-dot"></span>
-          ${me ? `Prijavljen kao <b>${esc(me.username)}</b>` : 'Registracija nije potrebna za igru'}
+        <div class="turn-banner" id="homeBotStatus" data-state="active">Klikni belu figuru i odigraj potez.</div>
+        <div class="bot-guide">
+          <h3>Tabla je spremna</h3>
+          <p>Izaberi figuru direktno na velikoj tabli. Oznake će pokazati gde možeš da je pomeriš.</p>
+          <div id="homeBotMoves" class="moves compact-moves">Još nema poteza.</div>
+          <p class="muted">Za novu bot partiju ponovo klikni „Igraj sa botom“ u meniju.</p>
         </div>
-      </div>
+      </aside>
     </section>
   `);
 
-  renderBoard(
-    document.querySelector('#homeBoard'),
-    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-    null,
-    () => {}
-  );
+  const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  let gameId = null;
+  let state = { fen:initialFen, legalMoves:[], history:[], turn:'w', botThinking:false, gameOver:false };
+  let selected = null;
+  let starting = false;
 
-  document.querySelector('#new').onclick = async () => {
+  function drawHomeGame() {
+    const legalTargets = selected
+      ? (state.legalMoves || []).filter(move => move.from === selected).map(move => move.to)
+      : [];
+    renderBoard(document.querySelector('#homeBoard'), state.fen, selected, playHomeMove, 'w', {
+      lastMove:state.lastMove,
+      legalTargets
+    });
+    document.querySelector('#homeOpponentStatus').textContent = state.botThinking ? 'razmišlja…' : 'lagani nivo';
+    document.querySelector('#homeBotStatus').textContent = state.gameOver
+      ? `Partija završena${state.endReason ? ` — ${state.endReason}` : ''}`
+      : state.botThinking
+        ? 'TOP Bot razmišlja…'
+        : gameId ? 'Ti si na potezu' : 'Klikni belu figuru i odigraj potez.';
+    document.querySelector('#homeBotStatus').dataset.state = state.gameOver ? 'ended' : state.botThinking ? 'waiting' : 'active';
+    document.querySelector('#homeBotMoves').textContent = state.history?.join(' · ') || 'Još nema poteza.';
+  }
+
+  async function ensureHomeGame() {
+    if (gameId || starting) return;
+    starting = true;
+    document.querySelector('#homeBotStatus').textContent = 'Pripremam partiju…';
     try {
-      const data = await api('/games', { method: 'POST', body: '{}' });
-      localStorage.topPlayerId = data.playerId;
-      openGame(data.id);
+      const created = await api('/games/bot', { method:'POST', body:'{}' });
+      gameId = created.id;
+      if (created.playerId) localStorage.topPlayerId = created.playerId;
+      state = await api(`/games/${gameId}`);
+      const socket = io({ auth:{ playerId:localStorage.topPlayerId || '' } });
+      activeSocket = socket;
+      socket.emit('join-game', gameId);
+      socket.on('state', nextState => {
+        state = { ...state, ...nextState };
+        selected = null;
+        drawHomeGame();
+      });
+    } catch (error) {
+      gameId = null;
+      alert(error.message);
+    } finally {
+      starting = false;
+      drawHomeGame();
+    }
+  }
+
+  async function playHomeMove(square) {
+    await ensureHomeGame();
+    if (!gameId || state.gameOver || state.botThinking || state.turn !== 'w') return;
+    const movable = (state.legalMoves || []).some(move => move.from === square);
+    if (!selected) {
+      if (!movable) return;
+      selected = square;
+      return drawHomeGame();
+    }
+    if (square === selected) {
+      selected = null;
+      return drawHomeGame();
+    }
+    const legal = (state.legalMoves || []).some(move => move.from === selected && move.to === square);
+    if (!legal && movable) {
+      selected = square;
+      return drawHomeGame();
+    }
+    if (!legal) {
+      selected = null;
+      return drawHomeGame();
+    }
+    try {
+      state = await api(`/games/${gameId}/move`, {
+        method:'POST',
+        body:JSON.stringify({ move:{ from:selected, to:square, promotion:'q' } })
+      });
     } catch (error) {
       alert(error.message);
     }
-  };
-  document.querySelector('#botGame').onclick = async () => {
-    try {
-      const data = await api('/games/bot', { method: 'POST', body: '{}' });
-      if (data.playerId) localStorage.topPlayerId = data.playerId;
-      openGame(data.id);
-    } catch (error) {
-      alert(error.message);
-    }
-  };
-  document.querySelector('#join').onclick = () => {
-    const id = prompt('Unesi kod ili ID partije')?.trim();
-    if (id) openGame(id);
-  };
+    selected = null;
+    drawHomeGame();
+  }
+
+  drawHomeGame();
 }
 
 async function friendsPage() {
@@ -547,12 +643,70 @@ function renderBoard(board, fen, selected, onPick, orientation = 'w', options = 
   });
 }
 
+function resizeAvatar(file) {
+  return new Promise((resolve, reject) => {
+    if (!file?.type?.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      return reject(new Error('Izaberi PNG, JPG ili WebP sliku manju od 5 MB.'));
+    }
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const size = Math.min(image.naturalWidth, image.naturalHeight);
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const context = canvas.getContext('2d');
+      context.drawImage(
+        image,
+        (image.naturalWidth - size) / 2,
+        (image.naturalHeight - size) / 2,
+        size,
+        size,
+        0,
+        0,
+        256,
+        256
+      );
+      URL.revokeObjectURL(url);
+      let data = canvas.toDataURL('image/webp', 0.82);
+      if (data.length > 300000) data = canvas.toDataURL('image/jpeg', 0.72);
+      if (data.length > 300000) return reject(new Error('Slika nije mogla dovoljno da se smanji.'));
+      resolve(data);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Slika nije mogla da se učita.'));
+    };
+    image.src = url;
+  });
+}
+
 async function profilePage() {
   if (!me) return view('login');
   layout(`
     <section class="card">
       <h1>Profil</h1>
-      <p>Korisničko ime: <b>${esc(me.username)}</b></p>
+      <div class="profile-identity">
+        <div class="avatar-editor">
+          <span id="profileAvatar" class="profile-avatar">${avatarHtml(me)}</span>
+          <label class="upload-button" for="avatarFile">Promeni sliku</label>
+          <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          <button id="removeAvatar" type="button">Ukloni sliku</button>
+        </div>
+        <form id="profileDetails">
+          <label>Korisničko ime<input value="${esc(me.username)}" disabled></label>
+          <label>Država<input name="country" value="${esc(me.country || '')}" maxlength="80" list="countries" placeholder="Na primer: Srbija"></label>
+          <datalist id="countries">
+            <option value="Srbija"><option value="Crna Gora"><option value="Bosna i Hercegovina">
+            <option value="Hrvatska"><option value="Severna Makedonija"><option value="Slovenija">
+          </datalist>
+          <label>Biografija<textarea name="bio" maxlength="280" placeholder="Napiši nekoliko reči o sebi">${esc(me.bio || '')}</textarea></label>
+          <button class="primary">Sačuvaj profil</button>
+          <p id="profileDetailsMessage" class="muted"></p>
+        </form>
+      </div>
+      <div class="section-divider"></div>
+      <h2>Sekvence poteza</h2>
       <p class="muted">Unesi dve odvojene sekvence. Potezi moraju biti odigrani tačno prikazanim redom.</p>
       <div class="sequence-grid">
         <section class="sequence-editor">
@@ -579,6 +733,36 @@ async function profilePage() {
       <p id="profileMessage" class="muted"></p>
     </section>
   `);
+
+  let avatar = me.avatar || '';
+  const avatarPreview = document.querySelector('#profileAvatar');
+  document.querySelector('#avatarFile').onchange = async event => {
+    try {
+      avatar = await resizeAvatar(event.target.files[0]);
+      avatarPreview.innerHTML = `<img src="${avatar}" alt="Profilna slika">`;
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+  document.querySelector('#removeAvatar').onclick = () => {
+    avatar = '';
+    avatarPreview.textContent = me.username[0].toUpperCase();
+  };
+  document.querySelector('#profileDetails').onsubmit = async event => {
+    event.preventDefault();
+    try {
+      const details = Object.fromEntries(new FormData(event.target));
+      me = await api('/profile', {
+        method:'PATCH',
+        body:JSON.stringify({ ...details, avatar })
+      });
+      localStorage.topUser = JSON.stringify(me);
+      updateSidebarUser();
+      document.querySelector('#profileDetailsMessage').textContent = 'Profil je sačuvan.';
+    } catch (error) {
+      document.querySelector('#profileDetailsMessage').textContent = error.message;
+    }
+  };
 
   const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -707,7 +891,7 @@ async function gamePage(id) {
         </div>
         <div id="board" class="board"></div>
         <div class="player-bar">
-          <span class="player-avatar">${me ? esc(me.username[0].toUpperCase()) : 'G'}</span>
+          <span class="player-avatar">${avatarHtml(me)}</span>
           <span><b id="playerName">${me ? esc(me.username) : 'Gost'}</b><small>ti</small></span>
         </div>
       </section>

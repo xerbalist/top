@@ -12,15 +12,23 @@
     <div class="app-shell">
       <header class="sidebar">
         <button class="brand" data-view="home" aria-label="TOP početna">
-          <span class="brand-mark">♜</span>
+          <img class="brand-mark" src="/top-logo.svg" alt="">
           <span>TOP</span>
         </button>
         <nav aria-label="Glavna navigacija">
-          <button data-view="home"><span class="nav-icon">♟</span><span>Igraj</span></button>
-          <button data-view="friends"><span class="nav-icon">♞</span><span>Prijatelji</span></button>
+          <button data-view="home"><span class="nav-icon">♞</span><span>Igraj sa botom</span></button>
+          <button data-action="new-game"><span class="nav-icon">♜</span><span>Nova partija</span></button>
+          <button data-action="join-game"><span class="nav-icon">➜</span><span>Unesi kod</span></button>
+          <button data-view="friends"><span class="nav-icon">♙</span><span>Prijatelji</span></button>
           <button data-view="profile"><span class="nav-icon">♚</span><span>Profil</span></button>
         </nav>
-        <button data-view="login" id="authBtn" class="auth-button">Prijava</button>
+        <div class="sidebar-account">
+          <button data-view="profile" id="sidebarUser" class="sidebar-user">
+            <span id="sidebarAvatar" class="sidebar-avatar">G</span>
+            <span><b id="sidebarUsername">Gost</b><small id="sidebarCountry">Bez naloga</small></span>
+          </button>
+          <button data-view="login" id="authBtn" class="auth-button"><span class="nav-icon">●</span><span>Prijava</span></button>
+        </div>
       </header>
       <main id="root"></main>
     </div>

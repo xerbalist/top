@@ -10,6 +10,8 @@ Podrži mat, pat, remi, predaju i normalan završetak partije. Početna strana u
 
 UI treba da bude uglađen, moderan i vizuelno inspirisan vodećim šahovskim platformama: tamna pozadina, zelene akcije, bočna navigacija, velika tabla, jasan panel partije, oznaka poslednjeg poteza i prikaz legalnih odredišta. Ne kopiraj tuđe logotipe ili zaštićene elemente. Omogući igru protiv ugrađenog lightweight TOP Bota koji koristi `chess.js`, evaluaciju materijala i pozicije i alpha-beta pretragu, bez spoljnog AI servisa.
 
+Sve glavne opcije moraju biti u stalnom levom sidebaru, sa TOP logotipom na vrhu i korisničkim blokom pri dnu. Početna strana je odmah interaktivna partija protiv TOP Bota: korisnik treba samo da klikne belu figuru na velikoj tabli. Profil podržava kvadratnu profilnu sliku, biografiju do 280 karaktera i državu, a podaci se čuvaju u PostgreSQL bazi.
+
 Mnemonic fraza mora da koristi samo srpske reči koje se prirodno pišu bez dijakritika, nikada ošišanu latinicu. Posle registracije omogući kopiranje i preuzimanje fraze kao `.txt` fajla.
 
 Interfejs neka bude jednostavan, moderan i vizuelno inspirisan Lichess-om, bez napredne analize, rejtinga, turnira, Stockfish-a, javnih soba ili privatnih poruka. Svi važni podaci i potezi moraju se proveravati na serveru. Dodaj rate limiting, bezbedne hash funkcije za lozinke, sesije/JWT u sigurnim cookie-jima, validaciju unosa, cleanup memorijskih soba i Coolify/Docker dokumentaciju.
