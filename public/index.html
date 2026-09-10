@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=20260910-6">
+    <link rel="stylesheet" href="/styles.css?v=20260910-7">
     <script src="/socket.io/socket.io.js"></script>
   </head>
   <body>
@@ -17,13 +17,16 @@
         <button class="brand" data-view="home" aria-label="TOP početna">
           <span>TOP</span>
         </button>
-        <nav aria-label="Glavna navigacija">
+        <button id="menuToggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="primaryNav sidebarAccount" aria-label="Otvori meni">
+          <span></span><span></span><span></span>
+        </button>
+        <nav id="primaryNav" aria-label="Glavna navigacija">
           <button data-view="home"><span>Igraj sa botom</span></button>
           <button data-action="new-game"><span>Nova partija</span></button>
           <button data-action="join-game"><span>Unesi kod</span></button>
           <button data-view="friends"><span>Prijatelji</span></button>
         </nav>
-        <div class="sidebar-account">
+        <div id="sidebarAccount" class="sidebar-account">
           <button data-view="profile" id="sidebarUser" class="sidebar-user" aria-label="Otvori profil" title="Profil">
             <span id="sidebarAvatar" class="sidebar-avatar">G</span>
             <span><b id="sidebarUsername">Gost</b><small id="sidebarCountry">Bez naloga</small></span>
@@ -33,6 +36,6 @@
       </header>
       <main id="root"></main>
     </div>
-    <script src="/app.js?v=20260910-6"></script>
+    <script src="/app.js?v=20260910-7"></script>
   </body>
 </html>

@@ -1,4 +1,6 @@
 const root = document.querySelector('#root');
+const sidebar = document.querySelector('.sidebar');
+const menuToggle = document.querySelector('#menuToggle');
 let me = JSON.parse(localStorage.topUser || 'null');
 let activeSocket = null;
 let accountSocket = null;
@@ -8,6 +10,24 @@ const esc = value => String(value).replace(
   /[&<>"']/g,
   character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
 );
+
+function setMobileMenu(open) {
+  sidebar.classList.toggle('menu-open', open);
+  menuToggle.setAttribute('aria-expanded', String(open));
+  menuToggle.setAttribute('aria-label', open ? 'Zatvori meni' : 'Otvori meni');
+}
+
+function closeMobileMenu() {
+  setMobileMenu(false);
+}
+
+menuToggle.onclick = () => setMobileMenu(!sidebar.classList.contains('menu-open'));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeMobileMenu();
+});
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 980) closeMobileMenu();
+});
 
 function topDialog({
   title = 'TOP',
@@ -151,6 +171,7 @@ function layout(content) {
 }
 
 function navigate(viewName) {
+  closeMobileMenu();
   if (viewName !== 'game' && location.hash) history.replaceState(null, '', location.pathname);
   view(viewName);
 }
@@ -161,6 +182,7 @@ function openGame(id) {
 }
 
 async function handleSidebarAction(action) {
+  closeMobileMenu();
   if (action === 'bot-game') return view('home');
   if (action === 'join-game') {
     const id = (await topPrompt('Kod ili ID partije', {

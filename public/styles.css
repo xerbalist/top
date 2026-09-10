@@ -127,6 +127,39 @@ textarea {
   box-shadow: none;
 }
 
+.menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.menu-toggle span {
+  display: block;
+  width: 24px;
+  height: 3px;
+  margin: 3px auto;
+  border-radius: 3px;
+  background: #fff;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.sidebar.menu-open .menu-toggle span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.sidebar.menu-open .menu-toggle span:nth-child(2) {
+  opacity: 0;
+}
+
+.sidebar.menu-open .menu-toggle span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
 .sidebar nav {
   display: grid;
   gap: 7px;
@@ -1037,7 +1070,7 @@ form {
     position: sticky;
     top: 0;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 1fr auto;
     align-items: center;
     height: auto;
     padding: 8px 12px;
@@ -1048,36 +1081,46 @@ form {
     font-size: 22px;
   }
 
-  .sidebar nav {
-    display: flex;
-    justify-content: center;
+  .menu-toggle {
+    display: block;
   }
 
-  .sidebar nav button,
-  .auth-button {
-    justify-content: center;
-    min-height: 42px;
-    padding: 8px 11px;
-  }
-
-  .auth-button {
-    margin-top: 0;
-  }
-
+  .sidebar nav,
   .sidebar-account {
-    display: flex;
-    align-items: center;
-    margin-top: 0;
-    padding: 0;
-    border: 0;
-  }
-
-  .sidebar-user {
-    width: auto;
-  }
-
-  .sidebar-user > span:last-child {
     display: none;
+  }
+
+  .sidebar.menu-open nav {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    gap: 4px;
+    padding-top: 10px;
+  }
+
+  .sidebar.menu-open nav button,
+  .sidebar.menu-open .auth-button {
+    justify-content: flex-start;
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  .sidebar.menu-open .sidebar-account {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    gap: 5px;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .sidebar.menu-open .sidebar-user {
+    width: 100%;
+  }
+
+  .sidebar.menu-open .sidebar-user > span:last-child {
+    display: grid;
   }
 
   #root {
@@ -1118,19 +1161,6 @@ form {
   .sidebar {
     grid-template-columns: 1fr auto;
     gap: 6px;
-  }
-
-  .sidebar nav {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-row: 2;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .sidebar-account {
-    position: absolute;
-    top: 8px;
-    right: 8px;
   }
 
   .sidebar nav button {
