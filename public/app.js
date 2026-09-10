@@ -284,20 +284,25 @@ function showMnemonic(phrase, username) {
 
 function authPage(registering) {
   layout(`
-    <section class="card">
-      <h1>${registering ? 'Registracija' : 'Prijava'}</h1>
-      <form id="auth">
-        <input name="username" placeholder="Korisničko ime" required>
-        <input name="password" type="password" placeholder="Lozinka" required minlength="8">
-        ${registering ? '<p class="muted">Posle registracije dobićeš mnemonic frazu za oporavak naloga.</p>' : ''}
-        <button class="primary">${registering ? 'Napravi nalog' : 'Prijavi se'}</button>
-      </form>
-      <p class="muted">
-        ${registering ? 'Već imaš nalog?' : 'Nemaš nalog?'}
-        <button id="switch">${registering ? 'Prijava' : 'Registracija'}</button>
-      </p>
-      ${registering ? '' : '<button id="recover">Oporavak pomoću mnemonic fraze</button>'}
-    </section>
+    <div class="auth-stage">
+      <section class="card auth-card">
+        <div class="auth-heading">
+          <img src="/top-logo.svg" alt="">
+          <div><small>Dobro došao/la u TOP</small><h1>${registering ? 'Registracija' : 'Prijava'}</h1></div>
+        </div>
+        <form id="auth">
+          <input name="username" placeholder="Korisničko ime" autocomplete="username" required>
+          <input name="password" type="password" placeholder="Lozinka" autocomplete="${registering ? 'new-password' : 'current-password'}" required minlength="8">
+          ${registering ? '<p class="muted auth-note">Posle registracije dobićeš mnemonic frazu za oporavak naloga.</p>' : ''}
+          <button class="primary">${registering ? 'Napravi nalog' : 'Prijavi se'}</button>
+        </form>
+        <div class="auth-secondary">
+          <span class="muted">${registering ? 'Već imaš nalog?' : 'Nemaš nalog?'}</span>
+          <button id="switch">${registering ? 'Prijava' : 'Registracija'}</button>
+          ${registering ? '' : '<button id="recover">Oporavak naloga</button>'}
+        </div>
+      </section>
+    </div>
   `);
 
   document.querySelector('#switch').onclick = () => view(registering ? 'login' : 'register');

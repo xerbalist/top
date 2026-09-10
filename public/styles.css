@@ -301,6 +301,65 @@ h2 {
   gap: 22px;
 }
 
+.auth-stage {
+  display: grid;
+  min-height: calc(100vh - 56px);
+  place-items: center;
+}
+
+.auth-card {
+  width: min(520px, 100%);
+  padding: clamp(24px, 4vw, 38px);
+}
+
+.auth-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 26px;
+}
+
+.auth-heading img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+}
+
+.auth-heading small {
+  color: var(--green);
+  font-weight: 800;
+}
+
+.auth-heading h1 {
+  margin: 2px 0 0;
+  font-size: clamp(32px, 5vw, 44px);
+}
+
+.auth-card form {
+  max-width: none;
+}
+
+.auth-card form > .primary {
+  width: 100%;
+}
+
+.auth-note {
+  margin: 2px 0;
+}
+
+.auth-secondary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.auth-secondary button {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
 form,
 .feed {
   display: grid;
@@ -1113,6 +1172,23 @@ form {
   .card,
   .home-actions {
     padding: 18px;
+  }
+
+  .auth-stage {
+    min-height: auto;
+    padding-top: 18px;
+  }
+
+  .auth-card {
+    padding: 24px 18px;
+  }
+
+  .auth-secondary {
+    align-items: stretch;
+  }
+
+  .auth-secondary .muted {
+    width: 100%;
   }
 
   .board {
