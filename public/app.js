@@ -39,7 +39,6 @@ function topDialog({
     overlay.innerHTML = `
       <section class="card top-dialog" role="dialog" aria-modal="true" aria-labelledby="topDialogTitle">
         <header class="top-dialog-header">
-          <img src="/top-logo.svg" alt="">
           <div><small>TOP</small><h2 id="topDialogTitle">${esc(title)}</h2></div>
         </header>
         <form class="top-dialog-form">
@@ -139,8 +138,8 @@ function layout(content) {
   root.innerHTML = content;
   const authButton = document.querySelector('#authBtn');
   authButton.innerHTML = me
-    ? '<span class="nav-icon">↪</span><span>Odjava</span>'
-    : '<span class="nav-icon">●</span><span>Prijava</span>';
+    ? '<span>Odjava</span>'
+    : '<span>Prijava</span>';
   authButton.dataset.view = me ? 'logout' : 'login';
   updateSidebarUser();
   document.querySelectorAll('[data-view]').forEach(button => {
@@ -233,7 +232,6 @@ function showMnemonic(phrase, username) {
     overlay.innerHTML = `
       <section class="card mnemonic-modal top-dialog" role="dialog" aria-modal="true" aria-labelledby="mnemonicTitle">
         <header class="top-dialog-header">
-          <img src="/top-logo.svg" alt="">
           <div><small>TOP</small><h2 id="mnemonicTitle">Sačuvaj mnemonic frazu</h2></div>
         </header>
         <div class="top-dialog-body">
@@ -287,7 +285,6 @@ function authPage(registering) {
     <div class="auth-stage">
       <section class="card auth-card">
         <div class="auth-heading">
-          <img src="/top-logo.svg" alt="">
           <div><small>Dobro došao/la u TOP</small><h1>${registering ? 'Registracija' : 'Prijava'}</h1></div>
         </div>
         <form id="auth">

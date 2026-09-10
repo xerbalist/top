@@ -38,7 +38,7 @@ body {
     radial-gradient(circle at 76% 10%, rgba(129, 182, 76, 0.08), transparent 26rem),
     linear-gradient(135deg, var(--bg) 0%, #2b2926 100%);
   color: var(--text);
-  font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 800 16px/1.45 "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 button,
@@ -54,7 +54,7 @@ textarea {
 button {
   min-height: 42px;
   padding: 10px 14px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.28);
   transition: transform 140ms ease, filter 140ms ease, background 140ms ease;
@@ -115,7 +115,6 @@ textarea {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-height: auto;
   margin: 0 7px 30px;
   padding: 0;
@@ -123,15 +122,9 @@ textarea {
   background: transparent;
   color: #fff;
   font-size: 30px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: -1.5px;
   box-shadow: none;
-}
-
-.brand-mark {
-  width: 43px;
-  height: 43px;
-  object-fit: contain;
 }
 
 .sidebar nav {
@@ -162,13 +155,6 @@ body[data-page="home"] .sidebar nav [data-view="home"],
 body[data-page="friends"] .sidebar nav [data-view="friends"] {
   background: rgba(129, 182, 76, 0.15);
   color: #fff;
-}
-
-.nav-icon {
-  width: 26px;
-  color: var(--green);
-  font-size: 25px;
-  text-align: center;
 }
 
 .auth-button {
@@ -225,7 +211,7 @@ body[data-page="profile"] .sidebar-user {
   place-items: center;
   border-radius: 7px;
   background: linear-gradient(145deg, #92c85b, #5f8d34);
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .sidebar-avatar img,
@@ -317,12 +303,6 @@ h2 {
   align-items: center;
   gap: 15px;
   margin-bottom: 26px;
-}
-
-.auth-heading img {
-  width: 54px;
-  height: 54px;
-  object-fit: contain;
 }
 
 .auth-heading small {
@@ -531,7 +511,7 @@ form {
   background: linear-gradient(145deg, #77726e, #504d49);
   color: #fff;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.14), 0 3px 8px rgba(0, 0, 0, 0.24);
 }
 
@@ -586,7 +566,7 @@ form {
 .eyebrow {
   color: #a9cf7f;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 1.8px;
 }
 
@@ -630,7 +610,7 @@ form {
 .play-option small {
   margin-top: 2px;
   color: rgba(255, 255, 255, 0.67);
-  font-weight: 500;
+  font-weight: 800;
 }
 
 .play-option.subtle {
@@ -845,7 +825,7 @@ form {
   border-radius: 18px;
   background: linear-gradient(145deg, #92c85b, #5f8d34);
   font-size: 60px;
-  font-weight: 900;
+  font-weight: 800;
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.3);
 }
 
@@ -856,7 +836,7 @@ form {
   place-items: center;
   border-radius: 8px;
   background: var(--panel-soft);
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -864,7 +844,7 @@ form {
   display: grid;
   gap: 6px;
   color: #d5d4d2;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .section-divider {
@@ -924,22 +904,15 @@ form {
 .top-dialog-header {
   display: flex;
   align-items: center;
-  gap: 13px;
   padding: 20px 22px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(24, 23, 21, 0.3);
 }
 
-.top-dialog-header img {
-  width: 43px;
-  height: 43px;
-  object-fit: contain;
-}
-
 .top-dialog-header small {
   color: var(--green);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.15em;
 }
 
@@ -977,7 +950,7 @@ form {
   gap: 7px;
   color: #dededc;
   font-size: 14px;
-  font-weight: 750;
+  font-weight: 800;
 }
 
 .top-dialog-field input,
@@ -1065,11 +1038,6 @@ form {
     font-size: 22px;
   }
 
-  .brand-mark {
-    width: 32px;
-    height: 32px;
-  }
-
   .sidebar nav {
     display: flex;
     justify-content: center;
@@ -1080,10 +1048,6 @@ form {
     justify-content: center;
     min-height: 42px;
     padding: 8px 11px;
-  }
-
-  .nav-icon {
-    display: none;
   }
 
   .auth-button {
