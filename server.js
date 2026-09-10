@@ -48,7 +48,14 @@ const words = [...new Set(`
   paket motor tunel balkon podrum krov zid
 `.trim().split(/\s+/))];
 if (words.some(word => !/^[a-z]+$/.test(word))) throw new Error('Mnemonic rečnik sadrži nedozvoljenu reč.');
-app.use(express.json({ limit: '512kb' })); app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '512kb' }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders:(res,filePath)=>{
+    if (/\.(?:html|js|css)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+  }
+}));
 app.use((req,res,next)=>{ const key=`${req.ip}:${req.path}`; const now=Date.now(); const recent=(requestBuckets.get(key)||[]).filter(t=>now-t<60000); if(recent.length>=120)return res.status(429).json({error:'Previše zahteva. Pokušaj ponovo za minut.'}); recent.push(now); requestBuckets.set(key,recent); next(); });
 const parseCookies = header => Object.fromEntries(String(header||'').split(';').map(item=>item.trim()).filter(Boolean).map(item=>{const at=item.indexOf('=');return at<0?[item,'']:[item.slice(0,at),decodeURIComponent(item.slice(at+1))]}));
 const requestToken = req => (req.headers.authorization||'').replace('Bearer ','') || parseCookies(req.headers.cookie).top_session || '';
@@ -165,7 +172,10 @@ const socketIdentity = socket => {
 };
 io.on('connection',socket=>{ socket.data.playerId=socketIdentity(socket); if(socket.data.playerId&&!String(socket.data.playerId).startsWith('anon:'))socket.join(`user:${socket.data.playerId}`); socket.on('join-game',id=>{ const g=findGame(id); if(!g||![g.players.w,g.players.b].includes(socket.data.playerId))return; socket.join(g.id); socket.data.game=g.id; }); socket.on('chat-message',({gameId,text}={})=>{ const g=findGame(gameId); const clean=String(text||'').trim(); if(!g?.unlocked||g.ended||g.chess.isGameOver()||![g.players.w,g.players.b].includes(socket.data.playerId)||!clean||clean.length>1000)return; io.to(g.id).emit('chat-message',{text:clean,at:Date.now()}); }); });
 setInterval(()=>{ const cutoff=Date.now()-86400000; for(const [id,g] of games)if(g.createdAt<cutoff){if(g.botTimer)clearTimeout(g.botTimer);games.delete(id);} const now=Date.now(); for(const [key,times] of requestBuckets) { const active=times.filter(t=>now-t<60000); if(active.length)requestBuckets.set(key,active); else requestBuckets.delete(key); }},3600000);
-app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
+app.get('*',(req,res)=>{
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname,'public/index.html'));
+});
 async function start(){
   if(process.env.NODE_ENV==='production'&&(!process.env.JWT_SECRET||!process.env.MNEMONIC_PEPPER)){
     throw new Error('JWT_SECRET i MNEMONIC_PEPPER moraju biti podešeni u produkciji.');

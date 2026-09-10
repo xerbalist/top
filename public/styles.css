@@ -289,13 +289,23 @@ h2 {
 
 .auth-stage {
   display: grid;
-  min-height: calc(100vh - 56px);
+  width: 100%;
   place-items: center;
 }
 
 .auth-card {
-  width: min(520px, 100%);
+  width: 100%;
+  max-width: 520px;
   padding: clamp(24px, 4vw, 38px);
+}
+
+body[data-page="login"] #root,
+body[data-page="register"] #root {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  place-items: center;
 }
 
 .auth-heading {
@@ -1139,8 +1149,12 @@ form {
   }
 
   .auth-stage {
-    min-height: auto;
     padding-top: 18px;
+  }
+
+  body[data-page="login"] #root,
+  body[data-page="register"] #root {
+    min-height: auto;
   }
 
   .auth-card {
