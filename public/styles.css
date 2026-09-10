@@ -253,6 +253,39 @@ form {
   min-width: 0;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.mnemonic-modal {
+  width: min(520px, 100%);
+}
+
+.mnemonic-modal textarea {
+  width: 100%;
+  resize: none;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  line-height: 1.7;
+}
+
+.confirm-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 18px 0;
+}
+
+.confirm-line input {
+  width: auto;
+}
+
 @media (max-width: 800px) {
   .chess {
     grid-template-columns: minmax(0, 1fr);

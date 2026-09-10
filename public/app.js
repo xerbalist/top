@@ -60,6 +60,45 @@ function view(viewName = 'home') {
   return homePage();
 }
 
+function showMnemonic(phrase) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <section class="card mnemonic-modal" role="dialog" aria-modal="true" aria-labelledby="mnemonicTitle">
+        <h2 id="mnemonicTitle">Sačuvaj mnemonic frazu</h2>
+        <p>Ovo je jedini način za oporavak naloga. Fraza se više neće prikazati.</p>
+        <textarea id="mnemonicValue" readonly rows="4">${esc(phrase)}</textarea>
+        <div class="form-actions">
+          <button id="copyMnemonic">Kopiraj frazu</button>
+        </div>
+        <label class="confirm-line">
+          <input id="mnemonicSaved" type="checkbox">
+          Sačuvao/la sam frazu na sigurnom mestu
+        </label>
+        <button id="finishRegistration" class="primary" disabled>Nastavi</button>
+      </section>
+    `;
+    document.body.appendChild(overlay);
+
+    const saved = overlay.querySelector('#mnemonicSaved');
+    const finish = overlay.querySelector('#finishRegistration');
+    saved.onchange = () => { finish.disabled = !saved.checked; };
+    overlay.querySelector('#copyMnemonic').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(phrase);
+        overlay.querySelector('#copyMnemonic').textContent = 'Kopirano';
+      } catch {
+        overlay.querySelector('#mnemonicValue').select();
+      }
+    };
+    finish.onclick = () => {
+      overlay.remove();
+      resolve();
+    };
+  });
+}
+
 function authPage(registering) {
   layout(`
     <section class="card">
@@ -67,7 +106,7 @@ function authPage(registering) {
       <form id="auth">
         <input name="username" placeholder="Korisničko ime" required>
         <input name="password" type="password" placeholder="Lozinka" required minlength="8">
-        ${registering ? '<label><input type="checkbox" required> Sačuvao/la sam mnemonic frazu</label>' : ''}
+        ${registering ? '<p class="muted">Posle registracije dobićeš mnemonic frazu za oporavak naloga.</p>' : ''}
         <button class="primary">${registering ? 'Napravi nalog' : 'Prijavi se'}</button>
       </form>
       <p class="muted">
@@ -91,7 +130,7 @@ function authPage(registering) {
       localStorage.removeItem('topPlayerId');
       localStorage.topUser = JSON.stringify(me);
       if (data.mnemonic) {
-        alert(`SAČUVAJ OVU FRAZU — prikazuje se samo sada:\n\n${data.mnemonic}`);
+        await showMnemonic(data.mnemonic);
       }
       view('home');
     } catch (error) {

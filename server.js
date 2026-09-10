@@ -44,7 +44,8 @@ const optionalAuth = (req,res,next)=>{ try { const token=requestToken(req); if(t
 const identity = req=>req.user?.id || req.headers['x-player-id'] || null;
 const mnemonic = ()=>Array.from({length:12},()=>words[crypto.randomInt(words.length)]).join(' ');
 const hashMnemonic = s=>crypto.createHash('sha256').update(`${s}|${PEPPER}`).digest('hex');
-const q = async (text, values=[])=>{ if(!pool) throw new Error('DATABASE_URL nije podešen.'); return pool.query(text,values); };
+const q = async (text, values=[])=>{ if(!pool){const error=new Error('PostgreSQL nije podešen.');error.code='DB_NOT_CONFIGURED';throw error} return pool.query(text,values); };
+const databaseUnavailable = error => !pool || error?.code==='DB_NOT_CONFIGURED' || error?.code==='ECONNREFUSED' || String(error?.code||'').startsWith('08');
 const safeUser = r=>({id:r.id,username:r.username,createdAt:r.created_at});
 const endReason = chess => {
   if (chess.isCheckmate()) return 'mat';
@@ -66,9 +67,9 @@ const gameState = g => ({
   endReason:g.endReason||endReason(g.chess)
 });
 
-app.get('/api/health',async(req,res)=>{ try { if(pool)await pool.query('SELECT 1'); res.json({ok:true,name:'TOP',database:pool?'connected':'not-configured',time:new Date().toISOString()}); } catch { res.status(503).json({ok:false,name:'TOP',database:'unavailable'}); } });
-app.post('/api/auth/register',async(req,res)=>{ try { const {username,password}=req.body; if(!/^[a-zA-Z0-9_]{3,24}$/.test(username||'')||(password||'').length<8) return res.status(400).json({error:'Korisničko ime ili lozinka nisu ispravni.'}); const phrase=mnemonic(); const h=await bcrypt.hash(password,12); const r=await q('INSERT INTO users(username,password_hash,mnemonic_hash) VALUES($1,$2,$3) RETURNING *',[username,h,hashMnemonic(phrase)]); const u=safeUser(r.rows[0]); res.setHeader('Set-Cookie',sessionCookie(createToken(u),2592000,req.secure)); res.json({user:u,mnemonic:phrase}); } catch(e){ res.status(400).json({error:e.code==='23505'?'Korisničko ime već postoji.':'Registracija nije uspela.'}); }});
-app.post('/api/auth/login',async(req,res)=>{ try { const r=await q('SELECT * FROM users WHERE lower(username)=lower($1)',[req.body.username]); if(!r.rows[0]||!(await bcrypt.compare(req.body.password||'',r.rows[0].password_hash))) return res.status(401).json({error:'Pogrešno korisničko ime ili lozinka.'}); const u=safeUser(r.rows[0]); res.setHeader('Set-Cookie',sessionCookie(createToken(u),2592000,req.secure)); res.json({user:u}); } catch { res.status(500).json({error:'Baza nije dostupna.'}); }});
+app.get('/api/health',async(req,res)=>{ if(!pool)return res.status(503).json({ok:false,name:'TOP',database:'not-configured'}); try { await pool.query('SELECT 1'); res.json({ok:true,name:'TOP',database:'connected',time:new Date().toISOString()}); } catch { res.status(503).json({ok:false,name:'TOP',database:'unavailable'}); } });
+app.post('/api/auth/register',async(req,res)=>{ try { const username=String(req.body.username||'').trim(); const password=String(req.body.password||''); if(!/^[a-zA-Z0-9_]{3,24}$/.test(username)||password.length<8) return res.status(400).json({error:'Korisničko ime mora imati 3–24 slova, broja ili _, a lozinka najmanje 8 karaktera.'}); const phrase=mnemonic(); const h=await bcrypt.hash(password,12); const r=await q('INSERT INTO users(username,password_hash,mnemonic_hash) VALUES($1,$2,$3) RETURNING *',[username,h,hashMnemonic(phrase)]); const u=safeUser(r.rows[0]); res.setHeader('Set-Cookie',sessionCookie(createToken(u),2592000,req.secure)); res.status(201).json({user:u,mnemonic:phrase}); } catch(e){ if(e.code==='23505')return res.status(409).json({error:'Korisničko ime već postoji.'}); if(databaseUnavailable(e))return res.status(503).json({error:'Registracija trenutno nije dostupna jer PostgreSQL baza nije povezana.'}); res.status(500).json({error:'Registracija nije uspela. Pokušaj ponovo.'}); }});
+app.post('/api/auth/login',async(req,res)=>{ try { const r=await q('SELECT * FROM users WHERE lower(username)=lower($1)',[req.body.username]); if(!r.rows[0]||!(await bcrypt.compare(req.body.password||'',r.rows[0].password_hash))) return res.status(401).json({error:'Pogrešno korisničko ime ili lozinka.'}); const u=safeUser(r.rows[0]); res.setHeader('Set-Cookie',sessionCookie(createToken(u),2592000,req.secure)); res.json({user:u}); } catch(e) { res.status(databaseUnavailable(e)?503:500).json({error:'Baza nije dostupna.'}); }});
 app.post('/api/auth/logout',(req,res)=>{ res.setHeader('Set-Cookie',sessionCookie('',0,req.secure)); res.json({ok:true}); });
 app.post('/api/auth/recover',async(req,res)=>{ try { const phrase=(req.body.mnemonic||'').trim().toLowerCase(); if(!/^[a-z ]+$/.test(phrase)) return res.status(400).json({error:'Mnemonic fraza sme sadržati samo slova bez dijakritike.'}); const r=await q('SELECT * FROM users WHERE lower(username)=lower($1) AND mnemonic_hash=$2',[req.body.username,hashMnemonic(phrase)]); if(!r.rows[0]) return res.status(400).json({error:'Podaci za oporavak nisu ispravni.'}); await q('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(req.body.password,12),r.rows[0].id]); res.json({ok:true}); } catch { res.status(500).json({error:'Oporavak nije uspeo.'}); }});
 app.post('/api/auth/change-password',auth,async(req,res)=>{ try { const current=String(req.body.currentPassword||''); const next=String(req.body.newPassword||''); if(next.length<8)return res.status(400).json({error:'Nova lozinka mora imati najmanje 8 karaktera.'}); const r=await q('SELECT password_hash FROM users WHERE id=$1',[req.user.id]); if(!r.rows[0]||!(await bcrypt.compare(current,r.rows[0].password_hash)))return res.status(400).json({error:'Trenutna lozinka nije ispravna.'}); await q('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(next,12),req.user.id]); res.json({ok:true}); } catch { res.status(500).json({error:'Promena lozinke nije uspela.'}); }});
@@ -117,6 +118,9 @@ app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 async function start(){
   if(process.env.NODE_ENV==='production'&&(!process.env.JWT_SECRET||!process.env.MNEMONIC_PEPPER)){
     throw new Error('JWT_SECRET i MNEMONIC_PEPPER moraju biti podešeni u produkciji.');
+  }
+  if(process.env.NODE_ENV==='production'&&!pool){
+    throw new Error('PostgreSQL konekcija mora biti podešena u produkciji.');
   }
   if(pool){
     const schema=await fs.readFile(path.join(__dirname,'schema.sql'),'utf8');
