@@ -91,6 +91,7 @@ const gameState = g => ({
   id:g.id,
   fen:g.chess.fen(),
   turn:g.chess.turn(),
+  inCheck:Boolean(g.chess.inCheck()),
   history:g.chess.history(),
   lastMove:g.lastMove || null,
   legalMoves:g.ended||g.chess.isGameOver()?[]:g.chess.moves({verbose:true}).map(move=>({from:move.from,to:move.to,promotion:move.promotion||null})),

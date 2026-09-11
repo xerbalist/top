@@ -414,7 +414,8 @@ function homePage() {
       : [];
     renderBoard(document.querySelector('#homeBoard'), state.fen, selected, playHomeMove, 'w', {
       lastMove:state.lastMove,
-      legalTargets
+      legalTargets,
+      checkColor:state.inCheck ? state.turn : null
     });
     document.querySelector('#homeOpponentStatus').textContent = state.botThinking ? 'razmišlja…' : 'lagani nivo';
     document.querySelector('#homeBotStatus').textContent = state.gameOver
@@ -744,7 +745,7 @@ async function friendsPage() {
   loadFeed();
 }
 
-function createSquare(x, y, piece, selected, onPick, lastMove, legalTargets) {
+function createSquare(x, y, piece, selected, onPick, lastMove, legalTargets, checkColor) {
   const square = document.createElement('div');
   square.className = `sq ${(x + y) % 2 ? 'dark' : 'light'}`;
   square.dataset.file = String.fromCharCode(97 + x);
@@ -759,7 +760,8 @@ function createSquare(x, y, piece, selected, onPick, lastMove, legalTargets) {
   }
   if (piece) {
     const color = piece === piece.toUpperCase() ? 'w' : 'b';
-    square.innerHTML = `<img class="piece-img" src="/pieces/cburnett/${color}${piece.toUpperCase()}.svg" alt="">`;
+    if (piece.toLowerCase() === 'k' && color === checkColor) square.classList.add('in-check');
+    square.innerHTML = `<img class="piece-img" src="/pieces/cburnett/${color}${piece.toUpperCase()}.svg" alt="" draggable="false">`;
   }
   if (legalTargets.has(square.dataset.square)) {
     square.insertAdjacentHTML('beforeend', '<span class="move-hint"></span>');
@@ -789,7 +791,7 @@ function renderBoard(board, fen, selected, onPick, orientation = 'w', options = 
   if (orientation === 'b') squares.reverse();
   const legalTargets = new Set(options.legalTargets || []);
   squares.forEach(square => {
-    board.appendChild(createSquare(square.x, square.y, square.piece, selected, onPick, options.lastMove, legalTargets));
+    board.appendChild(createSquare(square.x, square.y, square.piece, selected, onPick, options.lastMove, legalTargets, options.checkColor));
   });
 }
 
@@ -1129,7 +1131,8 @@ async function gamePage(id) {
       : [];
     renderBoard(document.querySelector('#board'), state.fen, selected, play, orientation, {
       lastMove:state.lastMove,
-      legalTargets
+      legalTargets,
+      checkColor:state.inCheck ? state.turn : null
     });
     const turnElement = document.querySelector('#turn');
     turnElement.textContent = state.gameOver

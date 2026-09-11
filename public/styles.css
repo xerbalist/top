@@ -559,6 +559,8 @@ body[data-page="game"] .chess {
   border-radius: 5px;
   background: var(--light-square);
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.42);
+  caret-color: transparent;
+  user-select: none;
 }
 
 .sq {
@@ -568,6 +570,8 @@ body[data-page="game"] .chess {
   min-height: 0;
   place-items: center;
   cursor: pointer;
+  outline: none;
+  user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -587,6 +591,15 @@ body[data-page="game"] .chess {
   box-shadow: inset 0 0 0 100px var(--highlight);
 }
 
+.sq.in-check {
+  background: radial-gradient(circle, #ef7770 0%, #cf3f3f 56%, #9e2929 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 218, 218, 0.28);
+}
+
+.sq.in-check .piece-img {
+  filter: drop-shadow(0 0 5px rgba(255, 235, 235, 0.72));
+}
+
 .piece-img {
   z-index: 1;
   display: block;
@@ -594,6 +607,7 @@ body[data-page="game"] .chess {
   height: 88%;
   object-fit: contain;
   pointer-events: none;
+  -webkit-user-drag: none;
   user-select: none;
   filter: drop-shadow(0 3px 1px rgba(0, 0, 0, 0.18));
   transition: transform 120ms ease;
