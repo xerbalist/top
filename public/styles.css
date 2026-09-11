@@ -439,6 +439,30 @@ body[data-page="game"] .app-shell {
   overflow: hidden;
 }
 
+body[data-page="home"] {
+  overflow: hidden;
+}
+
+body[data-page="home"] .app-shell {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body[data-page="home"] #root {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  padding: clamp(10px, 2vw, 28px);
+  overflow: hidden;
+}
+
+body[data-page="home"] .home-chess {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 370px);
+  align-items: stretch;
+}
+
 body[data-page="game"] #root {
   width: 100%;
   max-width: none;
@@ -463,7 +487,17 @@ body[data-page="game"] .chess {
   gap: 6px;
 }
 
+.home-board-column {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: 6px;
+}
+
 .game-board-column .player-bar,
+.home-board-column .player-bar,
 .board-game-controls {
   width: min(100%, 760px);
 }
@@ -483,9 +517,36 @@ body[data-page="game"] .chess {
   max-height: 100%;
 }
 
+.home-board-slot {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  place-items: center;
+  container-type: size;
+}
+
+.home-board-slot .board {
+  width: min(100cqw, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .board-game-controls {
   padding: 0;
   overflow: hidden;
+}
+
+.inline-game-actions {
+  display: flex;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.inline-game-actions button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .board {
@@ -652,6 +713,13 @@ body[data-page="game"] .chess {
   position: sticky;
   top: 28px;
   padding: 30px;
+}
+
+body[data-page="home"] .home-actions {
+  position: static;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .bot-home-panel {
@@ -917,27 +985,27 @@ body[data-page="game"] .chess {
   color: #d4b176;
 }
 
-:where(.moves, .chatlog) {
+:where(.moves, .chatlog, .home-actions) {
   scrollbar-color: #82b850 #211f1d;
   scrollbar-width: thin;
 }
 
-:where(.moves, .chatlog)::-webkit-scrollbar {
+:where(.moves, .chatlog, .home-actions)::-webkit-scrollbar {
   width: 9px;
 }
 
-:where(.moves, .chatlog)::-webkit-scrollbar-track {
+:where(.moves, .chatlog, .home-actions)::-webkit-scrollbar-track {
   border-radius: 99px;
   background: #211f1d;
 }
 
-:where(.moves, .chatlog)::-webkit-scrollbar-thumb {
+:where(.moves, .chatlog, .home-actions)::-webkit-scrollbar-thumb {
   border: 2px solid #211f1d;
   border-radius: 99px;
   background: linear-gradient(#9bce63, #638f39);
 }
 
-:where(.moves, .chatlog)::-webkit-scrollbar-thumb:hover {
+:where(.moves, .chatlog, .home-actions)::-webkit-scrollbar-thumb:hover {
   background: #afd871;
 }
 
@@ -1259,11 +1327,21 @@ body[data-page="game"] .chess {
     overflow-y: auto;
   }
 
+  body[data-page="home"] {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   body[data-page="game"] .app-shell,
   body[data-page="game"] #root,
   body[data-page="game"] .chess,
+  body[data-page="home"] .app-shell,
+  body[data-page="home"] #root,
+  body[data-page="home"] .home-chess,
   .game-board-column,
-  .game-panel {
+  .game-panel,
+  .home-board-column,
+  .home-actions {
     height: auto;
     overflow: visible;
   }
@@ -1272,12 +1350,18 @@ body[data-page="game"] .chess {
     grid-template-rows: auto auto auto auto;
   }
 
-  .game-board-slot {
+  .home-board-column {
+    grid-template-rows: auto auto auto;
+  }
+
+  .game-board-slot,
+  .home-board-slot {
     height: auto;
     container-type: normal;
   }
 
-  .game-board-slot .board {
+  .game-board-slot .board,
+  .home-board-slot .board {
     width: 100%;
     max-height: none;
   }
@@ -1300,6 +1384,12 @@ body[data-page="game"] .chess {
     max-height: 34dvh;
   }
 
+  .inline-game-actions button {
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
   .home-actions,
   .game-panel {
     position: static;
@@ -1319,6 +1409,45 @@ body[data-page="game"] .chess {
 
   .profile-identity {
     grid-template-columns: 1fr;
+  }
+
+  body[data-page="home"] {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  body[data-page="home"] .app-shell {
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body[data-page="home"] #root,
+  body[data-page="home"] .home-chess,
+  body[data-page="home"] .home-board-column {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body[data-page="home"] .home-board-column {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  body[data-page="home"] .home-board-slot {
+    height: 100%;
+    min-height: 0;
+    container-type: size;
+  }
+
+  body[data-page="home"] .home-board-slot .board {
+    width: min(100cqw, 100cqh);
+    max-height: 100%;
+  }
+
+  body[data-page="home"] .home-actions {
+    display: none;
   }
 }
 

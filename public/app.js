@@ -380,7 +380,7 @@ function homePage() {
           <span><b>TOP Bot</b><small id="homeOpponentStatus">lagani nivo</small></span>
           <span class="online-dot" title="Dostupan"></span>
         </div>
-        <div id="homeBoard" class="board" aria-label="Tabla za igru protiv TOP Bota"></div>
+        <div class="home-board-slot"><div id="homeBoard" class="board" aria-label="Tabla za igru protiv TOP Bota"></div></div>
         <div class="player-bar">
           <span class="player-avatar">${avatarHtml(me)}</span>
           <span><b>${me ? esc(me.username) : 'Gost'}</b><small>${me ? 'igraš belim figurama' : 'igraj bez naloga'}</small></span>
@@ -1048,19 +1048,19 @@ async function gamePage(id) {
           <span class="online-dot"></span>
         </div>
         <div class="game-board-slot"><div id="board" class="board"></div></div>
-        <div class="player-bar">
+        <div class="player-bar player-bar-self">
           <span class="player-avatar">${avatarHtml(me)}</span>
           <span><b id="playerName">${me ? esc(me.username) : 'Gost'}</b><small>ti</small></span>
+          <div class="inline-game-actions">
+            <button class="danger" id="resign">Predaj</button>
+            <button id="drawOffer">Remi</button>
+          </div>
         </div>
         <section class="card board-game-controls" id="boardGameControls">
           <div class="share-game" id="gameShare">
             <span>Kod partije</span>
             <b id="gameCode"></b>
             <button id="copyGame" title="Kopiraj kod">Kopiraj</button>
-          </div>
-          <div class="form-actions game-actions">
-            <button class="danger" id="resign">Predaj partiju</button>
-            <button id="drawOffer">Ponudi remi</button>
           </div>
         </section>
       </section>
@@ -1156,15 +1156,18 @@ async function gamePage(id) {
     movesElement.innerHTML = moveRows.join('') || '<p class="empty-moves">Partija je spremna. Povuci prvi potez.</p>';
     movesElement.scrollTop = movesElement.scrollHeight;
     document.querySelector('#gameTitle').textContent = state.bot ? 'Partija protiv TOP Bota' : 'Partija uživo';
-    document.querySelector('#opponentName').textContent = state.bot ? (state.botName || 'TOP Bot') : 'Protivnik';
-    document.querySelector('#opponentAvatar').textContent = state.bot ? '♞' : 'P';
+    const opponentColor = orientation === 'w' ? 'b' : 'w';
+    const opponentName = state.bot
+      ? (state.botName || 'TOP Bot')
+      : state.playerNames?.[opponentColor] || (state.ready ? 'Protivnik' : 'Čeka se protivnik');
+    document.querySelector('#opponentName').textContent = opponentName;
+    document.querySelector('#opponentAvatar').textContent = state.bot ? '♞' : opponentName[0]?.toUpperCase() || 'P';
     document.querySelector('#opponentAvatar').classList.toggle('bot-avatar', Boolean(state.bot));
     document.querySelector('#opponentStatus').textContent = state.bot
       ? state.botThinking ? 'razmišlja…' : 'lagani nivo'
       : state.ready ? 'povezan' : 'čeka se povezivanje';
     document.querySelector('.opponent-bar .online-dot').classList.toggle('offline', !state.ready);
-    document.querySelector('#gameShare').hidden = Boolean(state.bot);
-    document.querySelector('#boardGameControls').classList.toggle('bot-controls', Boolean(state.bot));
+    document.querySelector('#boardGameControls').hidden = Boolean(state.bot || state.ready);
     const messagesAvailable = state.chatUnlocked && !state.gameOver;
     document.querySelector('#messagePanel').hidden = !messagesAvailable;
     document.querySelector('#resign').disabled = state.gameOver || !state.ready;
