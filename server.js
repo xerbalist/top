@@ -166,11 +166,11 @@ app.post('/api/games/:id/draw-accept',optionalAuth,async(req,res)=>{ const g=fin
 app.post('/api/games/:id/draw-decline',optionalAuth,async(req,res)=>{ const g=findGame(req.params.id); const playerId=identity(req); if(!g||![g.players.w,g.players.b].includes(playerId))return res.status(403).json({error:'Nisi igrač ove partije.'}); g.drawOffer=null; io.to(g.id).emit('draw-declined'); res.json({ok:true}); });
 const socketIdentity = socket => {
   const token=String(socket.handshake.auth?.token||parseCookies(socket.handshake.headers.cookie).top_session||'');
-  if(token){try{return jwt.verify(token,JWT_SECRET).id}catch{}}
+  if(token){try{const user=jwt.verify(token,JWT_SECRET);return {id:user.id,name:user.username}}catch{}}
   const playerId=String(socket.handshake.auth?.playerId||'');
-  return playerId.startsWith('anon:')?playerId:null;
+  return playerId.startsWith('anon:')?{id:playerId,name:'Anonimni igrač'}:{id:null,name:null};
 };
-io.on('connection',socket=>{ socket.data.playerId=socketIdentity(socket); if(socket.data.playerId&&!String(socket.data.playerId).startsWith('anon:'))socket.join(`user:${socket.data.playerId}`); socket.on('join-game',id=>{ const g=findGame(id); if(!g||![g.players.w,g.players.b].includes(socket.data.playerId))return; socket.join(g.id); socket.data.game=g.id; }); socket.on('chat-message',({gameId,text}={})=>{ const g=findGame(gameId); const clean=String(text||'').trim(); if(!g?.unlocked||g.ended||g.chess.isGameOver()||![g.players.w,g.players.b].includes(socket.data.playerId)||!clean||clean.length>1000)return; io.to(g.id).emit('chat-message',{text:clean,at:Date.now()}); }); });
+io.on('connection',socket=>{ const identity=socketIdentity(socket); socket.data.playerId=identity.id; socket.data.playerName=identity.name; if(socket.data.playerId&&!String(socket.data.playerId).startsWith('anon:'))socket.join(`user:${socket.data.playerId}`); socket.on('join-game',id=>{ const g=findGame(id); if(!g||![g.players.w,g.players.b].includes(socket.data.playerId))return; socket.join(g.id); socket.data.game=g.id; }); socket.on('chat-message',({gameId,text}={})=>{ const g=findGame(gameId); const clean=String(text||'').trim(); if(!g?.unlocked||g.ended||g.chess.isGameOver()||![g.players.w,g.players.b].includes(socket.data.playerId)||!clean||clean.length>1000)return; io.to(g.id).emit('chat-message',{text:clean,sender:socket.data.playerName||'Igrač',playerId:socket.data.playerId,at:Date.now()}); }); });
 setInterval(()=>{ const cutoff=Date.now()-86400000; for(const [id,g] of games)if(g.createdAt<cutoff){if(g.botTimer)clearTimeout(g.botTimer);games.delete(id);} const now=Date.now(); for(const [key,times] of requestBuckets) { const active=times.filter(t=>now-t<60000); if(active.length)requestBuckets.set(key,active); else requestBuckets.delete(key); }},3600000);
 app.get('*',(req,res)=>{
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');

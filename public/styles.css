@@ -29,6 +29,8 @@
 html {
   min-width: 320px;
   background: var(--bg);
+  scrollbar-color: #709e45 #252321;
+  scrollbar-width: thin;
 }
 
 body {
@@ -39,6 +41,12 @@ body {
     linear-gradient(135deg, var(--bg) 0%, #2b2926 100%);
   color: var(--text);
   font: 800 16px/1.45 "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 button,
@@ -422,6 +430,64 @@ form {
   min-width: 0;
 }
 
+body[data-page="game"] {
+  overflow: hidden;
+}
+
+body[data-page="game"] .app-shell {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body[data-page="game"] #root {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  padding: clamp(10px, 2vw, 28px);
+  overflow: hidden;
+}
+
+body[data-page="game"] .chess {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 370px);
+  align-items: stretch;
+}
+
+.game-board-column {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  justify-items: center;
+  gap: 6px;
+}
+
+.game-board-column .player-bar,
+.board-game-controls {
+  width: min(100%, 760px);
+}
+
+.game-board-slot {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  place-items: center;
+  container-type: size;
+}
+
+.game-board-slot .board {
+  width: min(100cqw, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.board-game-controls {
+  padding: 0;
+  overflow: hidden;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -689,9 +755,12 @@ form {
 }
 
 .game-panel {
-  position: sticky;
-  top: 28px;
+  position: static;
+  display: flex;
+  height: 100%;
+  min-height: 0;
   padding: 0;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -742,10 +811,12 @@ form {
 }
 
 .game-moves {
-  min-height: 230px;
-  max-height: 310px;
+  min-height: 0;
+  max-height: 250px;
   margin: 0;
   padding: 8px 0;
+  flex: 0 1 250px;
+  overflow-y: auto;
   border-radius: 0;
   background: rgba(0, 0, 0, 0.1);
 }
@@ -777,7 +848,6 @@ form {
   align-items: center;
   gap: 9px;
   padding: 13px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--muted);
 }
 
@@ -806,20 +876,69 @@ form {
 }
 
 #chat {
+  display: flex;
+  min-height: 0;
   padding: 15px;
+  flex: 1;
+  flex-direction: column;
+}
+
+#messagePanel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 .chatlog {
-  height: 180px;
+  min-height: 100px;
+  height: auto;
   margin-bottom: 9px;
   padding: 12px;
-  overflow: auto;
+  flex: 1;
+  overflow-y: auto;
   border-radius: 7px;
   background: #211f1d;
 }
 
 .chatlog p {
   margin: 5px 0;
+}
+
+.chatlog p b {
+  color: var(--green);
+}
+
+.chatlog .own-message {
+  color: #f7f7f7;
+}
+
+.chatlog .opponent-message b {
+  color: #d4b176;
+}
+
+:where(.moves, .chatlog) {
+  scrollbar-color: #82b850 #211f1d;
+  scrollbar-width: thin;
+}
+
+:where(.moves, .chatlog)::-webkit-scrollbar {
+  width: 9px;
+}
+
+:where(.moves, .chatlog)::-webkit-scrollbar-track {
+  border-radius: 99px;
+  background: #211f1d;
+}
+
+:where(.moves, .chatlog)::-webkit-scrollbar-thumb {
+  border: 2px solid #211f1d;
+  border-radius: 99px;
+  background: linear-gradient(#9bce63, #638f39);
+}
+
+:where(.moves, .chatlog)::-webkit-scrollbar-thumb:hover {
+  background: #afd871;
 }
 
 .feed {
@@ -1133,6 +1252,52 @@ form {
   .chess,
   .sequence-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  body[data-page="game"] {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body[data-page="game"] .app-shell,
+  body[data-page="game"] #root,
+  body[data-page="game"] .chess,
+  .game-board-column,
+  .game-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .game-board-column {
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .game-board-slot {
+    height: auto;
+    container-type: normal;
+  }
+
+  .game-board-slot .board {
+    width: 100%;
+    max-height: none;
+  }
+
+  .game-panel {
+    min-height: 0;
+  }
+
+  .game-moves {
+    max-height: 250px;
+  }
+
+  #messagePanel,
+  #chat {
+    display: block;
+  }
+
+  .chatlog {
+    height: 220px;
+    max-height: 34dvh;
   }
 
   .home-actions,

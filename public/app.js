@@ -1047,11 +1047,22 @@ async function gamePage(id) {
           <span><b id="opponentName">Protivnik</b><small id="opponentStatus">povezan</small></span>
           <span class="online-dot"></span>
         </div>
-        <div id="board" class="board"></div>
+        <div class="game-board-slot"><div id="board" class="board"></div></div>
         <div class="player-bar">
           <span class="player-avatar">${avatarHtml(me)}</span>
           <span><b id="playerName">${me ? esc(me.username) : 'Gost'}</b><small>ti</small></span>
         </div>
+        <section class="card board-game-controls" id="boardGameControls">
+          <div class="share-game" id="gameShare">
+            <span>Kod partije</span>
+            <b id="gameCode"></b>
+            <button id="copyGame" title="Kopiraj kod">Kopiraj</button>
+          </div>
+          <div class="form-actions game-actions">
+            <button class="danger" id="resign">Predaj partiju</button>
+            <button id="drawOffer">Ponudi remi</button>
+          </div>
+        </section>
       </section>
       <aside class="card game-panel">
         <div class="game-panel-title">
@@ -1060,15 +1071,6 @@ async function gamePage(id) {
         </div>
         <div class="turn-banner" id="turn">Učitavanje…</div>
         <div id="moves" class="moves game-moves"></div>
-        <div class="share-game" id="gameShare">
-          <span>Kod partije</span>
-          <b id="gameCode"></b>
-          <button id="copyGame" title="Kopiraj kod">Kopiraj</button>
-        </div>
-        <div class="form-actions game-actions">
-          <button class="danger" id="resign">Predaj partiju</button>
-          <button id="drawOffer">Ponudi remi</button>
-        </div>
         <section id="messagePanel" hidden>
           <div class="panel-divider"></div>
           <div id="chat">
@@ -1150,7 +1152,9 @@ async function gamePage(id) {
         </div>
       `);
     }
-    document.querySelector('#moves').innerHTML = moveRows.join('') || '<p class="empty-moves">Partija je spremna. Povuci prvi potez.</p>';
+    const movesElement = document.querySelector('#moves');
+    movesElement.innerHTML = moveRows.join('') || '<p class="empty-moves">Partija je spremna. Povuci prvi potez.</p>';
+    movesElement.scrollTop = movesElement.scrollHeight;
     document.querySelector('#gameTitle').textContent = state.bot ? 'Partija protiv TOP Bota' : 'Partija uživo';
     document.querySelector('#opponentName').textContent = state.bot ? (state.botName || 'TOP Bot') : 'Protivnik';
     document.querySelector('#opponentAvatar').textContent = state.bot ? '♞' : 'P';
@@ -1160,6 +1164,7 @@ async function gamePage(id) {
       : state.ready ? 'povezan' : 'čeka se povezivanje';
     document.querySelector('.opponent-bar .online-dot').classList.toggle('offline', !state.ready);
     document.querySelector('#gameShare').hidden = Boolean(state.bot);
+    document.querySelector('#boardGameControls').classList.toggle('bot-controls', Boolean(state.bot));
     const messagesAvailable = state.chatUnlocked && !state.gameOver;
     document.querySelector('#messagePanel').hidden = !messagesAvailable;
     document.querySelector('#resign').disabled = state.gameOver || !state.ready;
@@ -1210,8 +1215,13 @@ async function gamePage(id) {
   });
   socket.on('chat-message', message => {
     const paragraph = document.createElement('p');
-    paragraph.textContent = message.text;
-    document.querySelector('#chatlog').appendChild(paragraph);
+    paragraph.className = message.playerId === currentPlayerId() ? 'own-message' : 'opponent-message';
+    const author = document.createElement('b');
+    author.textContent = `${message.sender || 'Igrač'}: `;
+    paragraph.append(author, document.createTextNode(message.text));
+    const chatlog = document.querySelector('#chatlog');
+    chatlog.appendChild(paragraph);
+    chatlog.scrollTop = chatlog.scrollHeight;
   });
 
   const sendMessage = () => {
