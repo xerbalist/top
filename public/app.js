@@ -1237,18 +1237,22 @@ async function gamePage(id) {
             : `Na potezu je ${state.turn === 'w' ? 'beli' : 'crni'}`;
     turnElement.dataset.state = state.gameOver ? 'ended' : state.turn === orientation ? 'active' : 'waiting';
     const moveRows = [];
-    for (let index = 0; index < state.history.length; index += 2) {
+    for (let index = 0; index < state.history.length; index += 1) {
       moveRows.push(`
         <div class="move-row">
-          <span>${index / 2 + 1}.</span>
+          <span>${Math.floor(index / 2) + 1}${index % 2 ? '…' : '.'}</span>
           <b>${esc(state.history[index] || '')}</b>
-          <b>${esc(state.history[index + 1] || '')}</b>
+          <span>${index % 2 ? 'Crni' : 'Beli'}</span>
         </div>
       `);
     }
     const movesElement = document.querySelector('#moves');
-    movesElement.innerHTML = moveRows.join('') || '<p class="empty-moves">Partija je spremna. Povuci prvi potez.</p>';
-    movesElement.scrollTop = movesElement.scrollHeight;
+    const historyKey = JSON.stringify(state.history);
+    if (movesElement.dataset.history !== historyKey) {
+      movesElement.innerHTML = moveRows.join('') || '<p class="empty-moves">Partija je spremna. Povuci prvi potez.</p>';
+      movesElement.dataset.history = historyKey;
+      movesElement.scrollTop = movesElement.scrollHeight;
+    }
     document.querySelector('#gameTitle').textContent = state.bot ? 'Partija protiv TOP Bota' : 'Partija uživo';
     const opponentColor = orientation === 'w' ? 'b' : 'w';
     const opponentName = state.bot
