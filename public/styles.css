@@ -18,6 +18,11 @@
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
 }
 
+.chat-security { padding: 8px 12px; font-size: 12px; }
+.chat-security p { margin: 0 0 5px; }
+.chat-security code { display: block; overflow-wrap: anywhere; }
+.chat-security button { margin-top: 6px; min-height: 32px; padding: 5px 9px; font-size: 12px; }
+
 * {
   box-sizing: border-box;
 }

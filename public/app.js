@@ -1,3 +1,4 @@
+import { EncryptedChat } from './chat-crypto.js';
 const root = document.querySelector('#root');
 const sidebar = document.querySelector('.sidebar');
 const menuToggle = document.querySelector('#menuToggle');
@@ -5,6 +6,8 @@ let me = JSON.parse(localStorage.topUser || 'null');
 let activeSocket = null;
 let accountSocket = null;
 let loggingOut = false;
+let clearActiveChat = () => {};
+window.addEventListener('pagehide', () => clearActiveChat());
 
 const esc = value => String(value).replace(
   /[&<>"']/g,
@@ -143,7 +146,7 @@ async function api(url, options = {}) {
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
-      ...(localStorage.topPlayerId ? { 'X-Player-Id': localStorage.topPlayerId } : {}),
+      'X-Top-Request': '1',
       ...(options.headers || {})
     }
   });
@@ -153,6 +156,8 @@ async function api(url, options = {}) {
 }
 
 function layout(content) {
+  clearActiveChat();
+  clearActiveChat = () => {};
   activeSocket?.disconnect();
   activeSocket = null;
   root.innerHTML = content;
@@ -209,7 +214,11 @@ async function performLogout() {
   loggingOut = true;
   try {
     await api('/auth/logout', { method:'POST', body:'{}' });
-  } catch {}
+  } catch (error) {
+    loggingOut = false;
+    await topAlert(error.message, 'Odjava nije uspela');
+    return;
+  }
   localStorage.removeItem('topToken');
   localStorage.removeItem('topUser');
   localStorage.removeItem('topPlayerId');
@@ -311,7 +320,7 @@ function authPage(registering) {
         </div>
         <form id="auth">
           <input name="username" placeholder="Korisničko ime" autocomplete="username" required>
-          <input name="password" type="password" placeholder="Lozinka" autocomplete="${registering ? 'new-password' : 'current-password'}" required minlength="8">
+          <input name="password" type="password" placeholder="Lozinka" autocomplete="${registering ? 'new-password' : 'current-password'}" required minlength="${registering ? 12 : 1}">
           ${registering ? '<p class="muted auth-note">Posle registracije dobićeš mnemonic frazu za oporavak naloga.</p>' : ''}
           <button class="primary">${registering ? 'Napravi nalog' : 'Prijavi se'}</button>
         </form>
@@ -353,7 +362,7 @@ function authPage(registering) {
       fields:[
         { name:'username', label:'Korisničko ime', required:true, autocomplete:'username' },
         { name:'mnemonic', label:'Mnemonic fraza', required:true, multiline:true, rows:3, placeholder:'sova golub motika…' },
-        { name:'password', label:'Nova lozinka', required:true, type:'password', minlength:8, autocomplete:'new-password' }
+        { name:'password', label:'Nova lozinka', required:true, type:'password', minlength:12, autocomplete:'new-password' }
       ],
       confirmText:'Promeni lozinku',
       cancelText:'Odustani'
@@ -881,6 +890,8 @@ async function profilePage() {
       <div class="form-actions profile-actions">
         <button id="saveMoveSequences" class="primary">Sačuvaj obe sekvence</button>
         <button id="changePassword">Promeni lozinku</button>
+        <button id="logoutAll">Odjavi sve uređaje</button>
+        <button id="rotateMnemonic">Nova fraza za oporavak</button>
       </div>
       <p id="profileMessage" class="muted"></p>
     </section>
@@ -1013,7 +1024,7 @@ async function profilePage() {
       title:'Promeni lozinku',
       fields:[
         { name:'currentPassword', label:'Trenutna lozinka', type:'password', required:true, autocomplete:'current-password' },
-        { name:'newPassword', label:'Nova lozinka', type:'password', required:true, minlength:8, autocomplete:'new-password' }
+        { name:'newPassword', label:'Nova lozinka', type:'password', required:true, minlength:12, autocomplete:'new-password' }
       ],
       confirmText:'Sačuvaj lozinku',
       cancelText:'Odustani'
@@ -1025,9 +1036,21 @@ async function profilePage() {
         body: JSON.stringify(passwords)
       });
       await topAlert('Nova lozinka je sačuvana.', 'Lozinka je promenjena');
+      await performLogout();
     } catch (error) {
       await topAlert(error.message, 'Lozinka nije promenjena');
     }
+  };
+  document.querySelector('#logoutAll').onclick=async()=>{
+    if(!await topConfirm('Odjaviti sve uređaje?',{title:'Odjava',confirmText:'Odjavi sve'}))return;
+    try{await api('/auth/logout-all',{method:'POST',body:'{}'});await performLogout();}
+    catch(error){await topAlert(error.message);}
+  };
+  document.querySelector('#rotateMnemonic').onclick=async()=>{
+    const data=await topDialog({title:'Nova fraza za oporavak',message:'Stara fraza prestaje da važi. Sačuvaj novu frazu odmah.',fields:[{name:'password',label:'Trenutna lozinka',type:'password',required:true}],confirmText:'Napravi novu frazu',cancelText:'Odustani'});
+    if(!data)return;
+    try{const result=await api('/auth/rotate-mnemonic',{method:'POST',body:JSON.stringify(data)});await showMnemonic(result.mnemonic,me.username);}
+    catch(error){await topAlert(error.message);}
   };
   try {
     const saved = await api('/profile/secret-moves');
@@ -1076,6 +1099,11 @@ async function gamePage(id) {
         <section id="messagePanel" hidden>
           <div class="panel-divider"></div>
           <div id="chat">
+            <div id="chatSecurity" class="chat-security">
+              <p id="chatSecurityStatus">Čeka se sagovornik…</p>
+              <code id="chatFingerprint"></code>
+              <button id="verifyChat" hidden>Potvrdi isti kod</button>
+            </div>
             <div class="chatlog" id="chatlog"></div>
             <div class="row">
               <input id="chatinput" maxlength="1000" autocomplete="off" placeholder="Napiši poruku">
@@ -1106,11 +1134,61 @@ async function gamePage(id) {
   }
   let selected = null;
   const currentPlayerId = () => me?.id || localStorage.topPlayerId;
+  let encryptedChat = null;
+  let preparingChat = null;
+  let disposedChat = false;
+  let incoming = Promise.resolve();
+  const wipeChat = () => {
+    encryptedChat?.clear(); encryptedChat = null;
+    document.querySelector('#chatlog')?.replaceChildren();
+    const input = document.querySelector('#chatinput'); if(input)input.value='';
+  };
+  clearActiveChat = () => { disposedChat=true;wipeChat(); };
+  const securityUI = () => {
+    if(disposedChat||!document.querySelector('#send'))return;
+    const verified=Boolean(encryptedChat?.verified);
+    document.querySelector('#send').disabled=!verified;
+    document.querySelector('#chatinput').disabled=!verified;
+    document.querySelector('#chatFingerprint').textContent=encryptedChat?.fingerprint || '';
+    document.querySelector('#verifyChat').hidden=!encryptedChat?.keys || verified;
+    document.querySelector('#chatSecurityStatus').textContent=verified
+      ? 'Enkriptovana sesija je potvrđena.'
+      : encryptedChat?.keys ? 'Uporedite ovaj kod telefonom ili drugim pouzdanim kanalom. Potvrdite samo ako je isti kod kod oba igrača.' : 'Čeka se sagovornik…';
+  };
+  const prepareChat = () => {
+    if(disposedChat||!socket.connected||!state.chatUnlocked||state.gameOver)return Promise.resolve();
+    if(preparingChat)return preparingChat;
+    if(encryptedChat)return Promise.resolve();
+    const self=currentPlayerId();
+    const peer=state.players.w===self?state.players.b:state.players.w;
+    const channel=new EncryptedChat(gameId,self,peer); encryptedChat=channel;
+    preparingChat=channel.init().then(publicKey=>{
+      if(encryptedChat===channel&&!state.gameOver)socket.emit('chat-key',{gameId,publicKey});
+    }).catch(()=>{wipeChat();if(!disposedChat&&document.querySelector('#chatSecurityStatus'))document.querySelector('#chatSecurityStatus').textContent='Enkripcija nije dostupna. Koristi HTTPS i moderan browser.';}).finally(()=>{preparingChat=null;});
+    return preparingChat;
+  };
   const socket = io({
     auth: { playerId: localStorage.topPlayerId || '' }
   });
   activeSocket = socket;
   socket.emit('join-game', gameId);
+  socket.on('connect',()=>{
+    incoming=incoming.then(async()=>{await preparingChat;if(disposedChat)return;wipeChat();socket.emit('join-game',gameId);await prepareChat();securityUI();}).catch(()=>{});
+  });
+  socket.on('disconnect',()=>{wipeChat();securityUI();});
+  socket.on('chat-key', payload=>{
+    incoming=incoming.then(async()=>{
+      if(disposedChat||!state.chatUnlocked||state.gameOver||!payload||payload.gameId!==gameId||payload.playerId===currentPlayerId())return;
+      await prepareChat();
+      const channel=encryptedChat;
+      if(!channel||payload.playerId!==channel.peerId)return;
+      const changed=await channel.acceptPeer(payload.publicKey);
+      if(encryptedChat!==channel||state.gameOver)return;
+      if(changed)document.querySelector('#chatlog').replaceChildren();
+      securityUI();
+    }).catch(()=>{wipeChat();securityUI();});
+  });
+  document.querySelector('#verifyChat').onclick=()=>{encryptedChat?.confirm();securityUI();};
   document.querySelector('#gameCode').textContent = gameId.slice(0, 8);
   document.querySelector('#copyGame').onclick = async () => {
     try {
@@ -1172,7 +1250,14 @@ async function gamePage(id) {
     document.querySelector('.opponent-bar .online-dot').classList.toggle('offline', !state.ready);
     document.querySelector('#boardGameControls').hidden = Boolean(state.bot || state.ready);
     const messagesAvailable = state.chatUnlocked && !state.gameOver;
+    if (state.gameOver) {
+      wipeChat();
+      document.querySelector('#chatlog').replaceChildren();
+      document.querySelector('#chatinput').value = '';
+    }
     document.querySelector('#messagePanel').hidden = !messagesAvailable;
+    if(messagesAvailable)prepareChat();
+    securityUI();
     document.querySelector('#resign').disabled = state.gameOver || !state.ready;
     document.querySelector('#drawOffer').hidden = Boolean(state.bot);
     document.querySelector('#drawOffer').disabled = state.gameOver || !state.ready;
@@ -1220,22 +1305,35 @@ async function gamePage(id) {
     render();
   });
   socket.on('chat-message', message => {
+    incoming=incoming.then(async()=>{
+    if (state.gameOver || !state.chatUnlocked) return;
+    const channel=encryptedChat;
+    if(!channel)return;
+    const text=await channel.decrypt(message.envelope,message.playerId);
+    if(state.gameOver||encryptedChat!==channel)return;
     const paragraph = document.createElement('p');
     paragraph.className = message.playerId === currentPlayerId() ? 'own-message' : 'opponent-message';
     const author = document.createElement('b');
     author.textContent = `${message.sender || 'Igrač'}: `;
-    paragraph.append(author, document.createTextNode(message.text));
+    paragraph.append(author, document.createTextNode(text));
     const chatlog = document.querySelector('#chatlog');
     chatlog.appendChild(paragraph);
+    while (chatlog.children.length > 100) chatlog.firstChild.remove();
     chatlog.scrollTop = chatlog.scrollHeight;
+    }).catch(()=>{});
   });
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const input = document.querySelector('#chatinput');
     const text = input.value.trim();
     if (!text) return;
-    socket.emit('chat-message', { gameId, text });
-    input.value = '';
+    try {
+      const channel=encryptedChat;
+      const envelope=await channel.encrypt(text);
+      if(state.gameOver||channel!==encryptedChat)return;
+      socket.emit('chat-message', { gameId, envelope });
+      input.value = '';
+    } catch { document.querySelector('#chatSecurityStatus').textContent='Poruka nije poslata. Proveri sigurnosni kod i vezu.'; }
   };
   document.querySelector('#send').onclick = sendMessage;
   document.querySelector('#chatinput').onkeydown = event => {

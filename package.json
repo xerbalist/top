@@ -5,8 +5,12 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "migrate": "node scripts/migrate.js",
     "dev": "node --watch server.js",
     "test": "node --check server.js && node --check public/app.js && node --test"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -15,5 +19,9 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.1",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "socket.io-client": "^4.8.3"
   }
 }

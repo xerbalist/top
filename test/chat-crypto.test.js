@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { EncryptedChat } from '../public/chat-crypto.js';
+test('encrypted chat: matching fingerprints, verification, tamper and replay rejection, key disposal',async()=>{
+  const a=new EncryptedChat('game','alice','bob'), b=new EncryptedChat('game','bob','alice');
+  await Promise.all([a.init(),b.init()]);
+  await Promise.all([a.acceptPeer(b.publicKey),b.acceptPeer(a.publicKey)]);
+  assert.equal(a.fingerprint,b.fingerprint);
+  await assert.rejects(a.encrypt('pre potvrde'));
+  a.confirm();b.confirm();
+  const envelope=await a.encrypt('Ćao, ovo ostaje među nama.');
+  assert.ok(!JSON.stringify(envelope).includes('Ćao'));
+  assert.equal(await b.decrypt(envelope,'alice'),'Ćao, ovo ostaje među nama.');
+  await assert.rejects(b.decrypt(envelope,'alice'));
+  const next=await a.encrypt('druga poruka');
+  await assert.rejects(b.decrypt({...next,ciphertext:'AAAA'+next.ciphertext.slice(4)},'alice'));
+  await assert.rejects(b.decrypt(next,'mallory'));
+  await assert.rejects(b.decrypt({...next,sequence:next.sequence+1},'alice'));
+  assert.equal(await b.decrypt(next,'alice'),'druga poruka');
+  const c=new EncryptedChat('game','alice','bob');await c.init();await c.acceptPeer(b.publicKey);
+  assert.notEqual(c.fingerprint,b.fingerprint);
+  await b.acceptPeer(c.publicKey);assert.equal(b.verified,false);
+  a.clear();b.clear();c.clear();
+  assert.equal(a.pair,null);assert.equal(a.keys,null);
+  await assert.rejects(a.encrypt('posle kraja'));
+});
