@@ -1,4 +1,13 @@
 import { EncryptedChat } from './chat-crypto.js';
+import { createGameSounds, watchGameSounds } from './game-sounds.js';
+const gameSounds = createGameSounds();
+const soundToggle = document.querySelector('#soundToggle');
+function syncSoundToggle() {
+  soundToggle.textContent = gameSounds.enabled ? 'Zvuk: uključen' : 'Zvuk: isključen';
+  soundToggle.setAttribute('aria-pressed', String(gameSounds.enabled));
+}
+soundToggle.onclick = () => { gameSounds.toggle(); syncSoundToggle(); };
+syncSoundToggle();
 const root = document.querySelector('#root');
 const sidebar = document.querySelector('.sidebar');
 const menuToggle = document.querySelector('#menuToggle');
@@ -416,8 +425,10 @@ function homePage() {
   let state = { fen:initialFen, legalMoves:[], history:[], turn:'w', botThinking:false, gameOver:false };
   let selected = null;
   let starting = false;
+  const announceSound = watchGameSounds(state, gameSounds.play);
 
   function drawHomeGame() {
+    announceSound(state);
     const legalTargets = selected
       ? (state.legalMoves || []).filter(move => move.from === selected).map(move => move.to)
       : [];
@@ -1134,6 +1145,7 @@ async function gamePage(id) {
   }
   let selected = null;
   const currentPlayerId = () => me?.id || localStorage.topPlayerId;
+  const announceSound = watchGameSounds(state, gameSounds.play);
   let encryptedChat = null;
   let preparingChat = null;
   let disposedChat = false;
@@ -1202,6 +1214,7 @@ async function gamePage(id) {
   };
 
   function render() {
+    announceSound(state);
     const playerId = currentPlayerId();
     const orientation = state.players?.b === playerId ? 'b' : 'w';
     const legalTargets = selected
