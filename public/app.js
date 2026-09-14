@@ -1,5 +1,7 @@
 import { EncryptedChat } from './chat-crypto.js';
 import { createGameSounds, watchGameSounds } from './game-sounds.js';
+import { createChallengeNotifications } from './challenge-notifications.js';
+const challengeNotifications = createChallengeNotifications({api,openGame});
 const gameSounds = createGameSounds();
 const soundToggle = document.querySelector('#soundToggle');
 function syncSoundToggle() {
@@ -240,12 +242,25 @@ async function performLogout() {
 
 function syncAccountSocket() {
   if (!me) {
+    challengeNotifications.clear();
     accountSocket?.disconnect();
     accountSocket = null;
     return;
   }
   if (accountSocket) return;
   accountSocket = io();
+  const socket = accountSocket;
+  socket.on('challenge-received', challenge => {
+    if(accountSocket===socket && me)challengeNotifications.add(challenge);
+  });
+  socket.on('challenge-resolved', ({id}={}) => challengeNotifications.remove(id));
+  socket.on('connect', async () => {
+    try {
+      const challenges=await api('/challenges');
+      if(accountSocket===socket && me)challenges.reverse().forEach(challenge=>challengeNotifications.add(challenge));
+    } catch { /* Pending invitations will be retried on reconnect. */ }
+  });
+  socket.on('disconnect', () => challengeNotifications.clear());
   accountSocket.on('challenge-accepted', ({ gameId } = {}) => {
     if (!gameId) return;
     localStorage.removeItem('topPlayerId');

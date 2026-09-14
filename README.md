@@ -74,6 +74,8 @@ Ovo je testirana implementacija standardnih Web Crypto primitiva, ne nezavisno r
 
 ## Statusi i prilozi
 
+Izazovi prijatelja prikazuju se kao iskačuća obaveštenja na svim stranicama dok je aplikacija otvorena. „Prihvati“ odmah otvara partiju, „Odbij“ odbija izazov, a × samo skriva obaveštenje (izazov ostaje među prijateljima). Posle ponovnog povezivanja učitavaju se važeći izazovi. Odgovor u jednom tabu uklanja obaveštenje iz ostalih tabova naloga. Ovo su obaveštenja unutar aplikacije, bez zahteva za sistemsku dozvolu za notifikacije.
+
 Stranica Društvo (opcija Prijatelji u meniju) prikazuje centralnu listu statusa i kartice Statusi, Prijatelji, Lajkovi i Retvitovi. Poslednje dve kartice prikazuju tvoje lajkovane/retvitovane objave. Retvit vraća objavu na vrh liste za postojeću publiku; ne proširuje pristup van autora i njegovih prihvaćenih prijatelja. Objave se učitavaju po 25.
 
 Objava može sadržati tekst do 280 karaktera, jednu PNG/JPEG/WebP sliku do 1.048.576 bajtova i HTTP/HTTPS link do 2048 karaktera. YouTube i ostali linkovi otvaraju se kroz klikabilne kartice; video se ne učitava automatski. Server ne preuzima sadržaj sa unetih linkova. Slike statusa se čuvaju u PostgreSQL-u i isporučuju samo autorizovanim korisnicima; brišu se sa statusom/nalogom. Ovo ne menja privremeni, enkriptovani čet u partiji.

@@ -429,6 +429,14 @@ form {
 }
 
 .admin-users { display: grid; gap: 10px; margin: 20px 0; }
+.challenge-notification { position: fixed; z-index: 90; right: max(16px,env(safe-area-inset-right)); bottom: max(16px,env(safe-area-inset-bottom)); width: min(360px,calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 20px; border: 1px solid #91b85788; border-radius: 14px; background: #302e2b; box-shadow: 0 16px 60px #0009; }
+.challenge-notification-heading { display: flex; justify-content: space-between; align-items: center; color: #b0d879; }
+.challenge-notification-heading button { padding: 0; width: 32px; min-height: 32px; border: 0; background: transparent; box-shadow: none; font-size: 24px; }
+.challenge-notification p { margin: 10px 0; overflow-wrap: anywhere; }
+.challenge-notification small { color: #bdbbb6; }
+.challenge-notification .row { margin-top: 16px; }
+.challenge-notification .row button { flex: 1; min-height: 42px; }
+.challenge-notification [data-error]:empty { display: none; }
 .social-page { width: min(100%, 740px); margin-inline: auto; min-width: 0; }
 .social-header { padding: 12px 4px 0; }
 .social-header h1 { margin-bottom: 20px; }
