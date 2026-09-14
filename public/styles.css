@@ -1593,3 +1593,13 @@ body[data-page="home"] .home-actions {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Native file input stays keyboard-accessible; its label supplies the visual control. */
+.status-file { position: relative; }
+.status-file > span:first-child { display: block; margin-bottom: 10px; }
+.status-file .status-file-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; opacity: 0; overflow: hidden; }
+.status-file-picker { display: inline-flex; align-items: center; gap: 9px; min-height: 42px; padding: 9px 15px; border: 1px solid #91b85766; border-radius: 9px; color: #c9e7a0; background: #91b85718; cursor: pointer; }
+.status-file-picker:hover { background: #91b85730; }
+.status-file-input:focus-visible + .status-file-picker { outline: 2px solid #b0d879; outline-offset: 3px; }
+.status-file-symbol { font-size: 21px; line-height: 1; }
+.status-file-name { display: block; margin-top: 8px; overflow-wrap: anywhere; color: #bdbbb6; }

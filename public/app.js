@@ -253,11 +253,18 @@ function syncAccountSocket() {
   socket.on('challenge-received', challenge => {
     if(accountSocket===socket && me)challengeNotifications.add(challenge);
   });
+  socket.on('friend-request-received', request => {
+    if(accountSocket===socket && me)challengeNotifications.addFriend(request);
+  });
+  socket.on('friend-request-resolved', ({id}={}) => challengeNotifications.remove('friend:'+id));
   socket.on('challenge-resolved', ({id}={}) => challengeNotifications.remove(id));
   socket.on('connect', async () => {
     try {
-      const challenges=await api('/challenges');
-      if(accountSocket===socket && me)challenges.reverse().forEach(challenge=>challengeNotifications.add(challenge));
+      const results=await Promise.allSettled([api('/challenges'),api('/friends/requests')]);
+      if(accountSocket===socket && me) {
+        if(results[0].status==='fulfilled')results[0].value.reverse().forEach(challenge=>challengeNotifications.add(challenge));
+        if(results[1].status==='fulfilled')results[1].value.forEach(request=>challengeNotifications.addFriend(request));
+      }
     } catch { /* Pending invitations will be retried on reconnect. */ }
   });
   socket.on('disconnect', () => challengeNotifications.clear());
@@ -659,7 +666,11 @@ async function friendsPage() {
         <h2>Šta ima novo?</h2>
         <form id="status">
           <textarea name="body" maxlength="280" placeholder="Šta ima? (do 280 karaktera)"></textarea>
-          <label class="status-file">Dodaj sliku (PNG, JPEG, WebP · do 1 MB)<input id="statusImage" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <div class="status-file"><span>Dodaj sliku (PNG, JPEG, WebP · do 1 MB)</span>
+            <input id="statusImage" class="status-file-input" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Izaberi sliku" aria-describedby="statusFileName">
+            <label class="status-file-picker" for="statusImage"><span class="status-file-symbol" aria-hidden="true">＋</span><span>Izaberi sliku</span></label>
+            <span id="statusFileName" class="status-file-name" role="status">Slika nije izabrana</span>
+          </div>
           <img id="statusPreview" class="status-image" alt="Pregled izabrane slike" hidden>
           <button type="button" id="removeStatusImage" hidden>Ukloni sliku</button>
           <input name="link" type="url" maxlength="2048" placeholder="Link, na primer YouTube" aria-label="Link uz status">
@@ -767,7 +778,7 @@ async function friendsPage() {
   const imageInput = document.querySelector('#statusImage');
   const preview = document.querySelector('#statusPreview');
   const removeImage = document.querySelector('#removeStatusImage');
-  const clearImage = () => {statusImage='';imageInput.value='';preview.removeAttribute('src');preview.hidden=true;removeImage.hidden=true;};
+  const clearImage = () => {document.querySelector('#statusFileName').textContent='Slika nije izabrana';statusImage='';imageInput.value='';preview.removeAttribute('src');preview.hidden=true;removeImage.hidden=true;};
   removeImage.onclick = clearImage;
   imageInput.onchange = async () => {
     const file = imageInput.files[0];
@@ -778,7 +789,7 @@ async function friendsPage() {
     try {
       const data = await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
       if(imageInput.files[0]!==file)return;
-      statusImage=data;preview.src=data;preview.hidden=false;removeImage.hidden=false;
+      document.querySelector('#statusFileName').textContent=file.name;statusImage=data;preview.src=data;preview.hidden=false;removeImage.hidden=false;
     } catch {clearImage();await topAlert('Slika nije učitana.');}
   };
   document.querySelector('#status').onsubmit = async event => {

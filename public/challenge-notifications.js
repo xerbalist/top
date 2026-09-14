@@ -14,23 +14,24 @@ export function createChallengeNotifications({api,openGame}) {
     current=pending.values().next().value;
     if(!current)return;
     const challenge=current;
+    const friend=challenge.kind==='friend';
     box=document.createElement('aside');
     box.className='challenge-notification';
-    box.setAttribute('aria-label','Poziv za partiju');
-    box.innerHTML=`<div class="challenge-notification-heading"><span>Novi izazov</span><button type="button" data-close aria-label="Sakrij obaveštenje">×</button></div>
-      <p aria-live="polite"><b data-name></b> te izaziva na partiju.</p>
-      <small>Bez vremenskog ograničenja</small>
+    box.setAttribute('aria-label',friend?'Zahtev za prijateljstvo':'Poziv za partiju');
+    box.innerHTML=`<div class="challenge-notification-heading"><span>${friend?'Zahtev za prijateljstvo':'Novi izazov'}</span><button type="button" data-close aria-label="Sakrij obaveštenje">×</button></div>
+      <p aria-live="polite"><b data-name></b> ${friend?'želi da budete prijatelji.':'te izaziva na partiju.'}</p>
+      <small>${friend?'Povežite se i igrajte zajedno':'Bez vremenskog ograničenja'}</small>
       <div class="row"><button class="primary" data-accept>Prihvati</button><button data-decline>Odbij</button></div>
       <p data-error role="status"></p><small data-count></small>`;
     box.querySelector('[data-name]').textContent=challenge.challenger;
-    box.querySelector('[data-count]').textContent=pending.size>1?`Još izazova: ${pending.size-1}`:'';
+    box.querySelector('[data-count]').textContent=pending.size>1?`Još obaveštenja: ${pending.size-1}`:'';
     box.querySelector('[data-close]').onclick=()=>remove(challenge.id);
     async function respond(status) {
       if(busy)return;
       const version=generation, element=box;
       busy=true;element.querySelectorAll('button').forEach(button=>button.disabled=true);
       try {
-        const result=await api(`/challenges/${challenge.id}/respond`,{method:'POST',body:JSON.stringify({status})});
+        const result=await api(friend?'/friends/respond':`/challenges/${challenge.id}/respond`,{method:'POST',body:JSON.stringify(friend?{status,id:challenge.requester,requestId:challenge.requestId}:{status})});
         if(version!==generation)return;
         pending.delete(challenge.id);dismissed.add(challenge.id);
         if(result.gameId)openGame(result.gameId);
@@ -51,6 +52,10 @@ export function createChallengeNotifications({api,openGame}) {
       if(!challenge || typeof challenge.id!=='string' || typeof challenge.challenger!=='string' || !Number.isFinite(Date.parse(challenge.expires_at)))return;
       if(dismissed.has(challenge.id)||pending.has(challenge.id)||pending.size>=50)return;
       pending.set(challenge.id,challenge);render();
+    },
+    addFriend(request) {
+      if(!request || !/^[0-9]+$/.test(String(request.id)) || typeof request.requester!=='string' || typeof request.username!=='string')return;
+      this.add({id:'friend:'+request.id,kind:'friend',requestId:String(request.id),requester:request.requester,challenger:request.username,expires_at:'9999-12-31T00:00:00Z'});
     },
     remove,
     clear() {generation++;pending.clear();dismissed.clear();busy=false;current=null;box?.remove();box=null;}
