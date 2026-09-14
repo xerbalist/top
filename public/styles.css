@@ -689,6 +689,13 @@ body[data-page="game"] .chess {
 
 .player-bar > span:nth-child(2) {
   display: grid;
+  min-width: 0;
+}
+
+.player-bar > span:nth-child(2) > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-avatar {
@@ -1277,6 +1284,7 @@ body[data-page="home"] .home-actions {
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
@@ -1342,8 +1350,8 @@ body[data-page="home"] .home-actions {
 }
 
 @media (max-width: 800px) {
-  .home-chess,
-  .chess,
+  body[data-page="home"] .home-chess,
+  body[data-page="game"] .chess,
   .sequence-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1408,6 +1416,7 @@ body[data-page="home"] .home-actions {
   .chatlog {
     height: clamp(260px, 45dvh, 480px);
     max-height: none;
+    overflow-wrap: anywhere;
   }
 
   .inline-game-actions button {
@@ -1496,6 +1505,12 @@ body[data-page="home"] .home-actions {
   .card,
   .home-actions {
     padding: 18px;
+  }
+
+  .card.game-panel {
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
   .auth-stage {
