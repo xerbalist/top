@@ -429,6 +429,23 @@ form {
 }
 
 .admin-users { display: grid; gap: 10px; margin: 20px 0; }
+.social-page { width: min(100%, 740px); margin-inline: auto; min-width: 0; }
+.social-header { padding: 12px 4px 0; }
+.social-header h1 { margin-bottom: 20px; }
+.social-tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #55534d; }
+.social-tabs button { border: 0; border-radius: 8px 8px 0 0; box-shadow: none; padding: 12px 4px; font-size: clamp(11px,2.7vw,15px); background: transparent; }
+.social-tabs button[aria-pressed="true"] { color: #b0d879; border-bottom: 3px solid #91b857; background: #ffffff08; }
+.social-timeline { padding: 24px; }
+.social-timeline form { max-width: none; }
+.social-timeline .status { overflow-wrap: anywhere; padding-block: 22px; border-bottom: 1px solid #ffffff16; }
+.social-actions { gap: 6px; }
+.social-actions button { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+.social-actions button[aria-pressed="true"] { color: #b0d879; background: #91b85726; }
+.status-image { display: block; width: 100%; max-height: 480px; object-fit: contain; border-radius: 12px; margin: 12px 0; background: #211f1d; }
+.status-file { display: block; margin-block: 12px; font-size: 12px; color: #bdbbb6; }
+.status-file input { max-width: 100%; margin-top: 8px; }
+.status-link { display: block; padding: 14px; margin-block: 10px; border: 1px solid #ffffff22; border-radius: 10px; color: #b0d879; text-decoration: none; overflow-wrap: anywhere; }
+.status-link small { display: block; color: #bdbbb6; font-size: 12px; margin-top: 6px; }
 .admin-user { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-radius: 8px; background: rgba(0,0,0,.16); }
 .admin-user > div { min-width: 0; overflow-wrap: anywhere; }
 .admin-user small { display: block; margin-top: 5px; color: #bdbbb6; }

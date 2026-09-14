@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { advanceSequence, moveForColor, validatePersonalSequence } from './lib/move-sequence.js';
 import { botMove } from './lib/bot-pool.js';
 import { installAdmin, isAdmin } from './lib/admin.js';
+import { installSocial, statusAudience } from './lib/social.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express(); const server = http.createServer(app);
@@ -73,6 +74,7 @@ app.use((req,res,next)=>{
   }
   next();
 });
+app.use('/api/statuses', express.json({ limit: '1450kb' }));
 app.use(express.json({ limit: '320kb' }));
 app.use('/api/auth', (req,res,next)=>{
   if (['/logout','/logout-all'].includes(req.path)) return next();
@@ -197,19 +199,18 @@ app.post('/api/friends/block',auth,async(req,res)=>{ if(req.body.userId===req.us
 app.delete('/api/friends/block/:userId',auth,async(req,res)=>{ await q(`DELETE FROM friendships WHERE requester=$1 AND addressee=$2 AND status='blocked'`,[req.user.id,req.params.userId]); res.json({ok:true}); });
 
 const canSeeStatus = async (req,res,next)=>{
-  const r=await q(`SELECT 1 FROM statuses s WHERE s.id=$1 AND (s.user_id=$2 OR EXISTS(SELECT 1 FROM friendships f WHERE ((f.requester=$2 AND f.addressee=s.user_id) OR (f.addressee=$2 AND f.requester=s.user_id)) AND f.status='accepted')) AND NOT EXISTS(SELECT 1 FROM friendships f WHERE ((f.requester=$2 AND f.addressee=s.user_id) OR (f.addressee=$2 AND f.requester=s.user_id)) AND f.status='blocked')`,[req.params.id,req.user.id]);
+  const r=await q(`SELECT 1 FROM statuses s JOIN users u ON u.id=s.user_id WHERE s.id=$2 AND ${statusAudience}`,[req.user.id,req.params.id]);
   if(!r.rows[0])return res.status(404).json({error:'Status nije dostupan.'});
   next();
 };
 
-app.post('/api/statuses',auth,async(req,res)=>{ const body=String(req.body.body||'').trim(); if(!body||body.length>280) return res.status(400).json({error:'Status mora imati od 1 do 280 karaktera.'}); const r=await q('INSERT INTO statuses(user_id,body) VALUES($1,$2) RETURNING *',[req.user.id,body]); res.json(r.rows[0]); });
+installSocial(app,{auth,q,canSeeStatus,limiter});
 app.delete('/api/statuses/:id',auth,async(req,res)=>{ const r=await q('DELETE FROM statuses WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.id]); if(!r.rows[0])return res.status(404).json({error:'Status nije pronađen.'}); res.json({ok:true}); });
 app.patch('/api/statuses/:id',auth,async(req,res)=>{ const body=String(req.body.body||'').trim(); if(!body||body.length>280)return res.status(400).json({error:'Status mora imati od 1 do 280 karaktera.'}); const r=await q('UPDATE statuses SET body=$1 WHERE id=$2 AND user_id=$3 RETURNING id,body,created_at',[body,req.params.id,req.user.id]); if(!r.rows[0])return res.status(404).json({error:'Status nije pronađen.'}); res.json(r.rows[0]); });
 app.post('/api/statuses/:id/like',auth,canSeeStatus,async(req,res)=>{ const exists=await q('SELECT 1 FROM status_likes WHERE status_id=$1 AND user_id=$2',[req.params.id,req.user.id]); if(exists.rows[0])await q('DELETE FROM status_likes WHERE status_id=$1 AND user_id=$2',[req.params.id,req.user.id]); else await q('INSERT INTO status_likes(status_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[req.params.id,req.user.id]); res.json({liked:!exists.rows[0]}); });
 app.get('/api/statuses/:id/replies',auth,canSeeStatus,async(req,res)=>{ const r=await q('SELECT r.id,r.body,r.created_at,u.username FROM status_replies r JOIN users u ON u.id=r.user_id WHERE r.status_id=$1 ORDER BY r.created_at ASC',[req.params.id]); res.json(r.rows); });
 app.post('/api/statuses/:id/replies',auth,canSeeStatus,async(req,res)=>{ const body=String(req.body.body||'').trim(); if(!body||body.length>280)return res.status(400).json({error:'Odgovor mora imati od 1 do 280 karaktera.'}); const r=await q('INSERT INTO status_replies(status_id,user_id,body) VALUES($1,$2,$3) RETURNING id,body,created_at',[req.params.id,req.user.id,body]); res.json(r.rows[0]); });
 app.post('/api/statuses/:id/report',auth,canSeeStatus,async(req,res)=>{ const reason=String(req.body.reason||'').trim(); if(reason.length>280)return res.status(400).json({error:'Razlog može imati najviše 280 karaktera.'}); const status=await q('SELECT user_id FROM statuses WHERE id=$1',[req.params.id]); if(!status.rows[0])return res.status(404).json({error:'Status nije pronađen.'}); if(status.rows[0].user_id===req.user.id)return res.status(400).json({error:'Ne možeš prijaviti svoj status.'}); await q('INSERT INTO status_reports(status_id,reporter_id,reason) VALUES($1,$2,$3) ON CONFLICT(status_id,reporter_id) DO UPDATE SET reason=excluded.reason,created_at=now()',[req.params.id,req.user.id,reason]); res.json({ok:true}); });
-app.get('/api/feed',auth,async(req,res)=>{ const r=await q(`SELECT s.id,s.body,s.created_at,u.username,(SELECT count(*) FROM status_likes l WHERE l.status_id=s.id) likes FROM statuses s JOIN users u ON u.id=s.user_id WHERE (s.user_id=$1 OR s.user_id IN (SELECT CASE WHEN requester=$1 THEN addressee ELSE requester END FROM friendships WHERE (requester=$1 OR addressee=$1) AND status='accepted')) AND NOT EXISTS(SELECT 1 FROM friendships f WHERE ((f.requester=$1 AND f.addressee=s.user_id) OR (f.addressee=$1 AND f.requester=s.user_id)) AND f.status='blocked') ORDER BY s.created_at DESC LIMIT 50`,[req.user.id]); res.json(r.rows); });
 app.post('/api/challenges',auth,async(req,res)=>{ const relation=await q(`SELECT 1 FROM friendships WHERE ((requester=$1 AND addressee=$2) OR (requester=$2 AND addressee=$1)) AND status='accepted'`,[req.user.id,req.body.userId]); if(!relation.rows[0])return res.status(403).json({error:'Izazov možeš poslati samo prijatelju.'}); const blocked=await q(`SELECT 1 FROM friendships WHERE ((requester=$1 AND addressee=$2) OR (requester=$2 AND addressee=$1)) AND status='blocked'`,[req.user.id,req.body.userId]); if(blocked.rows[0])return res.status(403).json({error:'Izazov nije moguć zbog blokade.'}); const id=crypto.randomUUID(); await q(`INSERT INTO challenges(id,challenger,opponent,expires_at) VALUES($1,$2,$3,now()+interval '24 hours')`,[id,req.user.id,req.body.userId]); res.json({id}); });
 app.get('/api/challenges',auth,async(req,res)=>{ const r=await q(`SELECT c.id,c.status,c.created_at,c.expires_at,u.username AS challenger FROM challenges c JOIN users u ON u.id=c.challenger WHERE c.opponent=$1 AND c.status='pending' AND c.expires_at>now() ORDER BY c.created_at DESC`,[req.user.id]); res.json(r.rows); });
 app.post('/api/challenges/:id/respond',auth,async(req,res)=>{

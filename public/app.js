@@ -576,6 +576,18 @@ function homePage() {
   drawHomeGame();
 }
 
+function statusLink(value) {
+  try {
+    const url=new URL(value);
+    if(!['http:','https:'].includes(url.protocol))return '';
+    const youtube=['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(url.hostname);
+    return `<a class="status-link" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${youtube?'Pogledaj na YouTube-u':esc(url.hostname)}<small>${esc(url.href)}</small></a>`;
+  } catch {return '';}
+}
+function statusText(value) {
+  return String(value).split(/(https?:\/\/[^\s]+)/g).map(part=>/^https?:\/\//.test(part)?statusLink(part):esc(part)).join('');
+}
+
 async function friendsPage() {
   if (!me) return view('login');
   let friends = [];
@@ -587,8 +599,14 @@ async function friendsPage() {
   }
 
   layout(`
-    <div class="grid">
-      <section class="card">
+    <div class="social-page">
+      <header class="social-header"><h1>Društvo</h1><nav class="social-tabs" aria-label="Društvo">
+        <button data-social-tab="all" aria-pressed="true">Statusi</button>
+        <button data-social-tab="friends" aria-pressed="false">Prijatelji</button>
+        <button data-social-tab="likes" aria-pressed="false">Lajkovi</button>
+        <button data-social-tab="reposts" aria-pressed="false">Retvitovi</button>
+      </nav></header>
+      <section class="card" id="friendPanel" hidden>
         <h1>Prijatelji</h1>
         <form id="search">
           <input name="q" placeholder="Pretraži korisničko ime">
@@ -622,13 +640,17 @@ async function friendsPage() {
           `).join('') || '<p class="muted">Još nemaš prijatelje.</p>'}
         </div>
       </section>
-      <section class="card">
-        <h2>Status</h2>
+      <section class="card social-timeline" id="timelinePanel">
+        <h2>Šta ima novo?</h2>
         <form id="status">
           <textarea name="body" maxlength="280" placeholder="Šta ima? (do 280 karaktera)"></textarea>
+          <label class="status-file">Dodaj sliku (PNG, JPEG, WebP · do 1 MB)<input id="statusImage" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <img id="statusPreview" class="status-image" alt="Pregled izabrane slike" hidden>
+          <button type="button" id="removeStatusImage" hidden>Ukloni sliku</button>
+          <input name="link" type="url" maxlength="2048" placeholder="Link, na primer YouTube" aria-label="Link uz status">
           <button class="primary">Objavi status</button>
         </form>
-        <div class="feed" id="feed"></div>
+        <div class="feed" id="feed"></div><button id="moreStatuses" hidden>Učitaj još</button>
       </section>
     </div>
   `);
@@ -726,15 +748,34 @@ async function friendsPage() {
       friendsPage();
     };
   });
+  let statusImage = '';
+  const imageInput = document.querySelector('#statusImage');
+  const preview = document.querySelector('#statusPreview');
+  const removeImage = document.querySelector('#removeStatusImage');
+  const clearImage = () => {statusImage='';imageInput.value='';preview.removeAttribute('src');preview.hidden=true;removeImage.hidden=true;};
+  removeImage.onclick = clearImage;
+  imageInput.onchange = async () => {
+    const file = imageInput.files[0];
+    if(!file){clearImage();return;}
+    if(file.size>1048576 || !['image/png','image/jpeg','image/webp'].includes(file.type)) {
+      clearImage();await topAlert('Izaberi PNG, JPEG ili WebP sliku do 1 MB.');return;
+    }
+    try {
+      const data = await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
+      if(imageInput.files[0]!==file)return;
+      statusImage=data;preview.src=data;preview.hidden=false;removeImage.hidden=false;
+    } catch {clearImage();await topAlert('Slika nije učitana.');}
+  };
   document.querySelector('#status').onsubmit = async event => {
     event.preventDefault();
     try {
       await api('/statuses', {
         method: 'POST',
-        body: JSON.stringify(Object.fromEntries(new FormData(event.target)))
+        body: JSON.stringify({...Object.fromEntries(new FormData(event.target)),image:statusImage})
       });
       event.target.reset();
-      loadFeed();
+      clearImage();
+      selectTab('all');
     } catch (error) {
       await topAlert(error.message, 'Status nije objavljen');
     }
@@ -742,6 +783,16 @@ async function friendsPage() {
 
   const feedElement = document.querySelector('#feed');
   let feedById = new Map();
+  let filter = 'all', offset = 0, requestVersion = 0;
+  const more = document.querySelector('#moreStatuses');
+  function selectTab(tab) {
+    document.querySelectorAll('[data-social-tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.socialTab===tab)));
+    document.querySelector('#friendPanel').hidden = tab!=='friends';
+    document.querySelector('#timelinePanel').hidden = tab==='friends';
+    if(tab!=='friends'){filter=tab;loadFeed();}
+  }
+  document.querySelectorAll('[data-social-tab]').forEach(button=>button.onclick=()=>selectTab(button.dataset.socialTab));
+  more.onclick = () => loadFeed(true);
 
   feedElement.onclick = async event => {
     const button = event.target.closest('[data-feed-action]');
@@ -752,10 +803,16 @@ async function friendsPage() {
     if (!status) return;
 
     try {
+      if (button.dataset.feedAction === 'repost') {
+        await api(`/statuses/${id}/repost`, {method:'POST',body:'{}'});
+        await loadFeed();
+      }
       if (button.dataset.feedAction === 'like') {
         const result = await api(`/statuses/${id}/like`, { method: 'POST', body: '{}' });
         status.likes = Math.max(0, Number(status.likes) + (result.liked ? 1 : -1));
-        button.textContent = `♥ ${status.likes}`;
+        button.textContent = `Lajkovi ${status.likes}`;
+        button.setAttribute('aria-pressed',String(result.liked));
+        if(filter==='likes')await loadFeed();
       }
       if (button.dataset.feedAction === 'edit') {
         const body = (await topPrompt('Tekst statusa', {
@@ -764,7 +821,7 @@ async function friendsPage() {
         if (!body) return;
         await api(`/statuses/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
         status.body = body;
-        article.querySelector('[data-status-body]').textContent = body;
+        article.querySelector('[data-status-body]').innerHTML = statusText(body);
       }
       if (button.dataset.feedAction === 'delete') {
         if (!await topConfirm('Obrisani status se ne može vratiti.', {
@@ -805,17 +862,27 @@ async function friendsPage() {
     }
   };
 
-  async function loadFeed() {
+  async function loadFeed(append = false) {
+    const version=++requestVersion;
+    more.disabled=true;
+    if(!append){offset=0;feedById.clear();}
     try {
-      const feed = await api('/feed');
-      feedById = new Map(feed.map(status => [String(status.id), status]));
-      feedElement.innerHTML = feed.map(status => `
+      const feed = await api(`/feed?filter=${filter}&offset=${offset}`);
+      if(version!==requestVersion || !feedElement.isConnected)return;
+      feed.forEach(status=>feedById.set(String(status.id),status));
+      offset+=feed.length;
+      more.hidden=feed.length<25;
+      const markup = feed.map(status => `
         <article class="status" data-status-id="${status.id}">
+          ${status.reposted?'<small class="muted">Retvitovao/la si ovu objavu</small><br>':''}
           <b>${esc(status.username)}</b>
           <small> · ${new Date(status.created_at).toLocaleString('sr-RS')}</small>
-          <p data-status-body>${esc(status.body)}</p>
+          <p data-status-body>${statusText(status.body)}</p>
+          ${status.has_image?`<img class="status-image" loading="lazy" src="/api/statuses/${status.id}/image" alt="Slika uz objavu korisnika ${esc(status.username)}">`:''}
+          ${status.link_url?statusLink(status.link_url):''}
           <div class="form-actions social-actions">
-            <button data-feed-action="like">♥ ${status.likes}</button>
+            <button data-feed-action="like" aria-pressed="${Boolean(status.liked)}">Lajkovi ${status.likes}</button>
+            <button data-feed-action="repost" aria-pressed="${Boolean(status.reposted)}">Retvitovi ${status.reposts||0}</button>
             <button data-feed-action="reply">Odgovori</button>
             ${status.username === me.username
               ? '<button data-feed-action="edit">Izmeni</button><button data-feed-action="delete">Obriši</button>'
@@ -823,10 +890,13 @@ async function friendsPage() {
           </div>
           <div class="replies" data-replies></div>
         </article>
-      `).join('') || '<p class="muted">Feed je prazan.</p>';
+      `).join('');
+      if(append)feedElement.insertAdjacentHTML('beforeend',markup);
+      else feedElement.innerHTML=markup || '<p class="muted">Nema objava u ovoj kartici.</p>';
     } catch (error) {
+      if(version!==requestVersion)return;
       feedElement.innerHTML = `<p class="muted">${esc(error.message)}</p>`;
-    }
+    } finally {if(version===requestVersion)more.disabled=false;}
   }
   loadFeed();
 }

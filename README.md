@@ -72,6 +72,14 @@ Server prima samo šifrat i metapodatke, ne plaintext. Ne upisuje poruke u bazu,
 Kraj partije, promena ključa, odjava ili prekid veze brišu prikazane poruke/ključne reference. Posle prekida potrebna je nova potvrda koda. Browser prikazuje najviše 100 poruka. Nema garancije fizičkog prepisivanja JavaScript memorije, niti zaštite od snimka ekrana ili kompromitovanog browsera.
 Ovo je testirana implementacija standardnih Web Crypto primitiva, ne nezavisno revidiran protokol poput Signal-a. Aktivno kompromitovan server može isporučiti izmenjen JavaScript; za takav model pretnje potreban je nezavisno distribuiran/verifikovan klijent.
 
+## Statusi i prilozi
+
+Stranica Društvo (opcija Prijatelji u meniju) prikazuje centralnu listu statusa i kartice Statusi, Prijatelji, Lajkovi i Retvitovi. Poslednje dve kartice prikazuju tvoje lajkovane/retvitovane objave. Retvit vraća objavu na vrh liste za postojeću publiku; ne proširuje pristup van autora i njegovih prihvaćenih prijatelja. Objave se učitavaju po 25.
+
+Objava može sadržati tekst do 280 karaktera, jednu PNG/JPEG/WebP sliku do 1.048.576 bajtova i HTTP/HTTPS link do 2048 karaktera. YouTube i ostali linkovi otvaraju se kroz klikabilne kartice; video se ne učitava automatski. Server ne preuzima sadržaj sa unetih linkova. Slike statusa se čuvaju u PostgreSQL-u i isporučuju samo autorizovanim korisnicima; brišu se sa statusom/nalogom. Ovo ne menja privremeni, enkriptovani čet u partiji.
+
+Ova verzija dodaje kolone `statuses.image_data`, `statuses.link_url` i tabelu `status_reposts`. Ako je `RUN_MIGRATIONS=false`, pokreni `npm run migrate` pre redeploya.
+
 ## Administracija igrača
 
 1. Prijavi se na svoj postojeći nalog i u **Profilu** kopiraj **ID naloga** (UUID).
