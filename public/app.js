@@ -142,6 +142,7 @@ function avatarHtml(user, fallback = 'G') {
 }
 
 function updateSidebarUser() {
+  document.querySelector('#adminNav').hidden = !me?.isAdmin;
   const userButton = document.querySelector('#sidebarUser');
   document.querySelector('#sidebarAvatar').innerHTML = avatarHtml(me);
   document.querySelector('#sidebarUsername').textContent = me?.username || 'Gost';
@@ -261,8 +262,73 @@ function view(viewName = 'home') {
   if (viewName === 'register') return authPage(true);
   if (viewName === 'friends') return friendsPage();
   if (viewName === 'profile') return profilePage();
+  if (viewName === 'admin') return adminPage();
   if (viewName === 'game') return gamePage(location.hash.slice(1));
   return homePage();
+}
+
+async function adminPage() {
+  if (!me?.isAdmin) return navigate('home');
+  layout(`<section class="card admin-panel">
+    <h1>Administracija</h1>
+    <p>Upravljanje registrovanim igračima. Blokiranje odjavljuje nalog i zatvara njegove partije.</p>
+    <form id="adminSearch" class="row"><input name="search" maxlength="24" aria-label="Pretraži igrače" placeholder="Korisničko ime"><button class="primary">Pretraži</button></form>
+    <p id="adminNotice" role="status"></p>
+    <div id="adminUsers" class="admin-users"></div>
+    <div class="row"><button id="adminPrev">Prethodna</button><span id="adminPageNumber"></span><button id="adminNext">Sledeća</button></div>
+  </section>`);
+  const panel = root.querySelector('.admin-panel');
+  const notice = panel.querySelector('#adminNotice');
+  const list = panel.querySelector('#adminUsers');
+  const prev = panel.querySelector('#adminPrev');
+  const next = panel.querySelector('#adminNext');
+  let page = 0, search = '', busy = false;
+  async function loadUsers() {
+    if (busy) return;
+    busy = true; prev.disabled = next.disabled = true;
+    notice.textContent = 'Učitavanje…';
+    try {
+      const data = await api(`/admin/users?q=${encodeURIComponent(search)}&page=${page}`);
+      if (!panel.isConnected) return;
+      list.innerHTML = data.users.map(user => `<article class="admin-user">
+        <div><b>${esc(user.username)}</b><small>${user.isAdmin?'Administrator':user.blocked?'Blokiran':'Aktivan'} · ${esc(new Date(user.created_at).toLocaleDateString('sr-Latn'))}</small></div>
+        <div class="row">${user.isAdmin?'<span>Zaštićen nalog</span>':`<button data-id="${esc(user.id)}" data-action="${user.blocked?'unblock':'block'}">${user.blocked?'Odblokiraj':'Blokiraj'}</button><button class="danger" data-id="${esc(user.id)}" data-action="delete">Obriši nalog</button>`}</div>
+      </article>`).join('');
+      notice.textContent = data.users.length?'':'Nema pronađenih igrača.';
+      panel.querySelector('#adminPageNumber').textContent = `Strana ${page+1}`;
+      prev.disabled = page === 0; next.disabled = !data.hasMore;
+      list.querySelectorAll('button').forEach(button => {
+        button.onclick = async () => {
+          const user = data.users.find(item=>item.id===button.dataset.id);
+          const action = button.dataset.action;
+          const deleting = action === 'delete';
+          const result = await topDialog({
+            title:deleting?'Trajno brisanje naloga':action==='block'?'Blokiranje naloga':'Odblokiranje naloga',
+            message:deleting?`Nalog ${user.username}, njegove objave, odgovori i veze sa prijateljima biće trajno obrisani. Ova radnja se ne može poništiti.`:`${action==='block'?'Blokirati':'Odblokirati'} nalog ${user.username}?`,
+            fields:[{name:'password',label:'Tvoja administratorska lozinka',type:'password',required:true,autocomplete:'current-password'},...(deleting?[{name:'username',label:`Za potvrdu unesi: ${user.username}`,required:true,maxlength:24}]:[])],
+            confirmText:deleting?'Trajno obriši':'Potvrdi',cancelText:'Odustani',danger:action!=='unblock'
+          });
+          if (!result || !panel.isConnected) return;
+          list.querySelectorAll('button').forEach(item=>item.disabled=true);
+          try {
+            await api(`/admin/users/${user.id}/moderate`,{method:'POST',body:JSON.stringify({action,...result})});
+            await loadUsers();
+          } catch(error) {
+            notice.textContent = error.message;
+            list.querySelectorAll('button').forEach(item=>item.disabled=false);
+          }
+        };
+      });
+    } catch(error) { notice.textContent = error.message; }
+    finally { busy = false; }
+  }
+  panel.querySelector('#adminSearch').onsubmit = event => {
+    event.preventDefault(); if(busy)return;
+    search = new FormData(event.currentTarget).get('search').trim(); page = 0; loadUsers();
+  };
+  prev.onclick = () => {if(!busy&&page>0){page--;loadUsers();}};
+  next.onclick = () => {if(!busy){page++;loadUsers();}};
+  await loadUsers();
 }
 
 function showMnemonic(phrase, username) {
@@ -867,6 +933,7 @@ async function profilePage() {
         </div>
         <form id="profileDetails">
           <label>Korisničko ime<input value="${esc(me.username)}" disabled></label>
+          <label>ID naloga<input value="${esc(me.id)}" readonly aria-label="ID naloga"></label>
           <label>Država<input name="country" value="${esc(me.country || '')}" maxlength="80" list="countries" placeholder="Na primer: Srbija"></label>
           <datalist id="countries">
             <option value="Srbija"><option value="Crna Gora"><option value="Bosna i Hercegovina">

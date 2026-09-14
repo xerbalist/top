@@ -71,3 +71,17 @@ Oba igrača moraju uporediti sigurnosni kod nezavisnim pouzdanim kanalom (npr. t
 Server prima samo šifrat i metapodatke, ne plaintext. Ne upisuje poruke u bazu, fajlove ili aplikacione logove i nema red istorije/replay poruka. Ipak, šifrat privremeno prolazi kroz RAM i mrežne bafere; apsolutna tvrdnja „nikakvi podaci nikad nisu na serveru” nije tačna.
 Kraj partije, promena ključa, odjava ili prekid veze brišu prikazane poruke/ključne reference. Posle prekida potrebna je nova potvrda koda. Browser prikazuje najviše 100 poruka. Nema garancije fizičkog prepisivanja JavaScript memorije, niti zaštite od snimka ekrana ili kompromitovanog browsera.
 Ovo je testirana implementacija standardnih Web Crypto primitiva, ne nezavisno revidiran protokol poput Signal-a. Aktivno kompromitovan server može isporučiti izmenjen JavaScript; za takav model pretnje potreban je nezavisno distribuiran/verifikovan klijent.
+
+## Administracija igrača
+
+1. Prijavi se na svoj postojeći nalog i u **Profilu** kopiraj **ID naloga** (UUID).
+2. U Coolify → Environment Variables postavi `ADMIN_USER_IDS` na taj ID. Za više administratora razdvoji njihove ID vrednosti zarezom. Ne koristi korisnička imena.
+3. Pokreni Redeploy i osveži stranicu. U meniju se pojavljuje **Administracija**.
+
+Migracija dodaje `users.blocked`; izvršava se pri pokretanju kada je `RUN_MIGRATIONS=true`. Ako koristiš `RUN_MIGRATIONS=false`, pre redeploya pokreni `npm run migrate` sa migracionim DB nalogom, kao i za ostale promene šeme.
+
+Admin ekran prikazuje 25 naloga po stranici i pretragu po imenu. Blokiranje, odblokiranje i brisanje zahtevaju administratorsku lozinku. Brisanje dodatno zahteva tačno korisničko ime. Administratorski nalozi su zaštićeni; za uklanjanje njihovih prava prvo izmeni `ADMIN_USER_IDS` u Coolifyju.
+
+Blokiranje zabranjuje prijavu tom nalogu, poništava sesije, prekida aktivne veze i zatvara njegove partije. Oporavak lozinke ne uklanja blokadu. Odblokirani igrač mora ponovo da se prijavi. Brisanje trajno uklanja nalog, sesije, statuse, reakcije, odgovore, prijave, prijateljstva i izazove povezane s nalogom kroz postojeća pravila baze. Aktivne partije se uklanjaju iz memorije. Sadržaj četa se ne dodaje u bazu niti prikazuje administratoru.
+
+Blokada važi za nalog: aplikacija i dalje dozvoljava anonimnu igru i pravljenje novih naloga. Ovo nije zabrana po uređaju ili IP adresi. Kopije baze u ranije napravljenim rezervnim kopijama imaju zaseban rok čuvanja.

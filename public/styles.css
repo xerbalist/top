@@ -428,6 +428,12 @@ form {
   justify-content: center;
 }
 
+.admin-users { display: grid; gap: 10px; margin: 20px 0; }
+.admin-user { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-radius: 8px; background: rgba(0,0,0,.16); }
+.admin-user > div { min-width: 0; overflow-wrap: anywhere; }
+.admin-user small { display: block; margin-top: 5px; color: #bdbbb6; }
+.admin-user button { min-height: 36px; padding: 7px 12px; font-size: 13px; }
+
 .chess {
   align-items: start;
 }

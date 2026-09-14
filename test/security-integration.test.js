@@ -83,6 +83,39 @@ test('PostgreSQL integration: sessions, recovery, blocks, social authorization a
     assert.equal((await call(`/games/${id}/resign`,'POST',{},g.cookie)).status,200);
     assert.equal((await call(`/games/${id}`,'GET',{},peer.cookie)).data.chatUnlocked,false);
     assert.equal((await db.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE '%chat%'")).rows[0].n,0);
+
+    // Administration is server-authorized; blocking invalidates HTTP and live sockets.
+    const adminLogin=await login('alice','final password 123');
+    assert.equal((await call('/admin/users','GET',{},adminLogin.cookie)).status,403);
+    process.env.ADMIN_USER_IDS=a.data.user.id;
+    assert.equal((await call('/me','GET',{},adminLogin.cookie)).data.isAdmin,true);
+    assert.equal((await call('/admin/users')).status,401);
+    assert.equal((await call('/admin/users','GET',{},b.cookie)).status,403);
+    const listing=await call('/admin/users?q=bob','GET',{},adminLogin.cookie);
+    assert.equal(listing.data.users.length,1);
+    assert.equal(listing.data.users[0].password_hash,undefined);
+    const moderate=(id,action,extra={})=>call(`/admin/users/${id}/moderate`,'POST',{action,password:'final password 123',...extra},adminLogin.cookie);
+    assert.equal((await moderate(a.data.user.id,'delete',{username:'alice'})).status,403);
+    assert.equal((await moderate(b.data.user.id,'block',{password:'wrong'})).status,403);
+    assert.equal((await call(`/admin/users/${a.data.user.id}/moderate`,'POST',{action:'delete',password:'valid password 123',username:'alice'},b.cookie)).status,403);
+    const active=await call('/games','POST',{},b.cookie);
+    const bs=client(base,{extraHeaders:{Cookie:b.cookie},reconnection:false});sockets.push(bs);await waitEvent(bs,'connect');
+    const bsClosed=waitEvent(bs,'disconnect');
+    assert.equal((await moderate(b.data.user.id,'block')).status,200);await bsClosed;
+    assert.equal((await login('bobby')).status,403);
+    assert.equal((await call('/me','GET',{},b.cookie)).status,401);
+    assert.equal((await call('/games','POST',{},b.cookie)).status,401);
+    assert.equal((await call(`/games/${active.data.id}`,'GET',{},adminLogin.cookie)).status,404);
+    assert.equal((await moderate(b.data.user.id,'unblock')).status,200);
+    assert.equal((await call('/me','GET',{},b.cookie)).status,401);
+    const unblocked=await login('bobby');assert.equal(unblocked.status,200);
+    await call('/statuses','POST',{body:'Delete with account'},unblocked.cookie);
+    assert.equal((await moderate(b.data.user.id,'delete',{username:'wrong'})).status,404);
+    assert.equal((await moderate(b.data.user.id,'delete',{username:'bobby'})).status,200);
+    assert.equal((await call('/me','GET',{},unblocked.cookie)).status,401);
+    assert.equal((await db.query('SELECT id FROM statuses WHERE user_id=$1',[b.data.user.id])).rows.length,0);
+    assert.equal((await db.query('SELECT id FROM friendships WHERE requester=$1 OR addressee=$1',[b.data.user.id])).rows.length,0);
+    delete process.env.ADMIN_USER_IDS;
   } finally {
     sockets.forEach(s=>s.disconnect());
     if(io)await new Promise(resolve=>io.close(resolve));

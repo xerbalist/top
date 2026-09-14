@@ -19,6 +19,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL mora biti podešen na HTTPS adresu aplikacije}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       PGHOST: db
       PGPORT: 5432

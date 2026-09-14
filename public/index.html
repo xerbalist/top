@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=20260914-mobile-board-2">
+    <link rel="stylesheet" href="/styles.css?v=20260914-admin-1">
     <script src="/socket.io/socket.io.js"></script>
   </head>
   <body>
@@ -25,6 +25,7 @@
           <button data-action="new-game"><span>Nova partija</span></button>
           <button data-action="join-game"><span>Unesi kod</span></button>
           <button data-view="friends"><span>Prijatelji</span></button>
+          <button data-view="admin" id="adminNav" hidden>Administracija</button>
           <button id="soundToggle" type="button" aria-pressed="true">Zvuk: uključen</button>
         </nav>
         <div id="sidebarAccount" class="sidebar-account">
@@ -37,6 +38,6 @@
       </header>
       <main id="root"></main>
     </div>
-    <script type="module" src="/app.js?v=20260912-chat-layout-1"></script>
+    <script type="module" src="/app.js?v=20260914-admin-1"></script>
   </body>
 </html>
