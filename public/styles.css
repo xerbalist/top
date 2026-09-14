@@ -1470,15 +1470,20 @@ body[data-page="home"] .home-actions {
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
+  body[data-page="home"] .home-chess {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
   body[data-page="home"] .home-board-slot {
     height: 100%;
     min-height: 0;
-    container-type: size;
+    container-type: normal;
   }
 
   body[data-page="home"] .home-board-slot .board {
-    width: min(100cqw, 100cqh);
-    max-height: 100%;
+    width: min(100%, calc(100svh - 200px));
+    height: auto;
+    max-height: none;
   }
 
   body[data-page="home"] .home-actions {
