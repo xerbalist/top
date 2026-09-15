@@ -78,9 +78,9 @@ Izazovi prijatelja prikazuju se kao iskačuća obaveštenja na svim stranicama d
 
 Stranica Društvo (opcija Prijatelji u meniju) prikazuje centralnu listu statusa i kartice Statusi, Prijatelji, Lajkovi i Retvitovi. Poslednje dve kartice prikazuju tvoje lajkovane/retvitovane objave. Retvit vraća objavu na vrh liste za postojeću publiku; ne proširuje pristup van autora i njegovih prihvaćenih prijatelja. Objave se učitavaju po 25.
 
-Objava može sadržati tekst do 280 karaktera, jednu PNG/JPEG/WebP sliku do 1.048.576 bajtova i HTTP/HTTPS link do 2048 karaktera. YouTube i ostali linkovi otvaraju se kroz klikabilne kartice; video se ne učitava automatski. Server ne preuzima sadržaj sa unetih linkova. Slike statusa se čuvaju u PostgreSQL-u i isporučuju samo autorizovanim korisnicima; brišu se sa statusom/nalogom. Ovo ne menja privremeni, enkriptovani čet u partiji.
+Objava može sadržati tekst do 280 karaktera, jednu PNG/JPEG/WebP sliku do 1.048.576 bajtova i HTTP/HTTPS link do 2048 karaktera. YouTube i ostali linkovi dobijaju pregled pre objave i naslov/sličicu uz novu objavu kada je dostupna. Video se ne pušta automatski. Server preuzima ograničene javne metapodatke i rastersku sličicu (do 256 KB), uz validaciju DNS adresa i svakog preusmerenja, vremensko ograničenje i zabranu privatnih mreža. Ako pregled nije dostupan, link se i dalje može objaviti. Starije objave zadržavaju običnu karticu. Slike statusa se čuvaju u PostgreSQL-u i isporučuju samo autorizovanim korisnicima; brišu se sa statusom/nalogom. Ovo ne menja privremeni, enkriptovani čet u partiji.
 
-Ova verzija dodaje kolone `statuses.image_data`, `statuses.link_url` i tabelu `status_reposts`. Ako je `RUN_MIGRATIONS=false`, pokreni `npm run migrate` pre redeploya.
+Ova verzija dodaje kolone `statuses.image_data`, `statuses.link_url` i tabelu `status_reposts`. Pregledi linkova dodaju i JSONB kolonu `statuses.link_preview`. Ako je `RUN_MIGRATIONS=false`, pokreni `npm run migrate` pre redeploya.
 
 ## Administracija igrača
 

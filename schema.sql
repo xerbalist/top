@@ -64,3 +64,5 @@ CREATE INDEX IF NOT EXISTS statuses_user_created_idx ON statuses(user_id, create
 CREATE INDEX IF NOT EXISTS status_replies_status_idx ON status_replies(status_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS status_reports_status_idx ON status_reports(status_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS challenges_opponent_status_idx ON challenges(opponent, status, expires_at);
+
+ALTER TABLE statuses ADD COLUMN IF NOT EXISTS link_preview JSONB NOT NULL DEFAULT '{}';

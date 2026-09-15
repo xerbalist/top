@@ -598,12 +598,12 @@ function homePage() {
   drawHomeGame();
 }
 
-function statusLink(value) {
+function statusLink(value, preview = {}, image = '') {
   try {
     const url=new URL(value);
     if(!['http:','https:'].includes(url.protocol))return '';
     const youtube=['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(url.hostname);
-    return `<a class="status-link" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${youtube?'Pogledaj na YouTube-u':esc(url.hostname)}<small>${esc(url.href)}</small></a>`;
+    return `<a class="status-link" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${image?`<img class="link-thumbnail" src="${esc(image)}" alt="" loading="lazy">`:''}<b>${esc(preview.title || (youtube?'Pogledaj na YouTube-u':url.hostname))}</b>${preview.description?`<span class="link-description">${esc(preview.description)}</span>`:''}<small>${esc(url.href)}</small></a>`;
   } catch {return '';}
 }
 function statusText(value) {
@@ -674,6 +674,7 @@ async function friendsPage() {
           <img id="statusPreview" class="status-image" alt="Pregled izabrane slike" hidden>
           <button type="button" id="removeStatusImage" hidden>Ukloni sliku</button>
           <input name="link" type="url" maxlength="2048" placeholder="Link, na primer YouTube" aria-label="Link uz status">
+          <div id="linkPreview" aria-live="polite"></div>
           <button class="primary">Objavi status</button>
         </form>
         <div class="feed" id="feed"></div><button id="moreStatuses" hidden>Učitaj još</button>
@@ -774,6 +775,23 @@ async function friendsPage() {
       friendsPage();
     };
   });
+  const linkInput=document.querySelector('#status input[name="link"]');
+  const previewBox=document.querySelector('#linkPreview');
+  let linkTimer, linkVersion=0;
+  linkInput.oninput=()=>{
+    clearTimeout(linkTimer);const version=++linkVersion;previewBox.innerHTML='';
+    const url=linkInput.value.trim();
+    if(!/^https?:\/\//i.test(url)||!linkInput.validity.valid)return;
+    previewBox.textContent='Učitavanje pregleda…';
+    linkTimer=setTimeout(async()=>{
+      try {
+        const preview=await api('/link-preview',{method:'POST',body:JSON.stringify({url})});
+        if(version!==linkVersion||!previewBox.isConnected)return;
+        const image=/^data:image\/(png|jpeg|webp);base64,/.test(preview.image||'')?preview.image:'';
+        previewBox.innerHTML=statusLink(url,preview,image);
+      } catch {if(version===linkVersion)previewBox.textContent='Pregled nije dostupan. Link možeš da objaviš.';}
+    },600);
+  };
   let statusImage = '';
   const imageInput = document.querySelector('#statusImage');
   const preview = document.querySelector('#statusPreview');
@@ -800,6 +818,7 @@ async function friendsPage() {
         body: JSON.stringify({...Object.fromEntries(new FormData(event.target)),image:statusImage})
       });
       event.target.reset();
+      clearTimeout(linkTimer);linkVersion++;previewBox.innerHTML='';
       clearImage();
       selectTab('all');
     } catch (error) {
@@ -905,7 +924,7 @@ async function friendsPage() {
           <small> · ${new Date(status.created_at).toLocaleString('sr-RS')}</small>
           <p data-status-body>${statusText(status.body)}</p>
           ${status.has_image?`<img class="status-image" loading="lazy" src="/api/statuses/${status.id}/image" alt="Slika uz objavu korisnika ${esc(status.username)}">`:''}
-          ${status.link_url?statusLink(status.link_url):''}
+          ${status.link_url?statusLink(status.link_url,status.link_preview||{},status.has_link_image?`/api/statuses/${status.id}/link-image`:''):''}
           <div class="form-actions social-actions">
             <button data-feed-action="like" aria-pressed="${Boolean(status.liked)}">Lajkovi ${status.likes}</button>
             <button data-feed-action="repost" aria-pressed="${Boolean(status.reposted)}">Retvitovi ${status.reposts||0}</button>
